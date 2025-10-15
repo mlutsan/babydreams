@@ -1,8 +1,8 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute } from "@tanstack/react-router";
 
-export const Route = createFileRoute('/history')({
+export const Route = createFileRoute("/history")({
   component: HistoryPage,
-})
+});
 
 function HistoryPage() {
   return (
@@ -10,5 +10,5 @@ function HistoryPage() {
       <h2 className="text-2xl font-bold text-foreground mb-6">Expense History</h2>
       <p className="text-muted-foreground">History list will go here (Phase 4)</p>
     </div>
-  )
+  );
 }

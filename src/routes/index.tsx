@@ -1,52 +1,52 @@
-import { createFileRoute } from '@tanstack/react-router'
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '~/components/ui/card'
-import { Input } from '~/components/ui/input'
-import { Label } from '~/components/ui/label'
-import { Select } from '~/components/ui/select'
-import { Textarea } from '~/components/ui/textarea'
-import { Button } from '~/components/ui/button'
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Select } from "~/components/ui/select";
+import { Textarea } from "~/components/ui/textarea";
+import { Button } from "~/components/ui/button";
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   component: Home,
-})
+});
 
 // Hardcoded categories for Phase 1
 const CATEGORIES = [
-  'Groceries',
-  'Transportation',
-  'Dining',
-  'Entertainment',
-  'Utilities',
-  'Healthcare',
-  'Shopping',
-  'Other',
-]
+  "Groceries",
+  "Transportation",
+  "Dining",
+  "Entertainment",
+  "Utilities",
+  "Healthcare",
+  "Shopping",
+  "Other",
+];
 
 function Home() {
   const [formData, setFormData] = useState({
-    amount: '',
-    date: new Date().toISOString().split('T')[0], // Today's date
-    category: '',
-    description: '',
-  })
+    amount: "",
+    date: new Date().toISOString().split("T")[0], // Today's date
+    category: "",
+    description: "",
+  });
 
   const handleSubmit = (e: React.FormEvent, addMore: boolean = false) => {
-    e.preventDefault()
-    console.log('Expense submitted:', formData)
+    e.preventDefault();
+    console.log("Expense submitted:", formData);
     // TODO: Add actual submission logic in Phase 3
-    alert('Expense saved! (In Phase 3, this will save to Google Sheets)')
+    alert("Expense saved! (In Phase 3, this will save to Google Sheets)");
 
     if (addMore) {
       // Reset form but keep the date
       setFormData({
-        amount: '',
+        amount: "",
         date: formData.date,
-        category: '',
-        description: '',
-      })
+        category: "",
+        description: "",
+      });
     }
-  }
+  };
 
   return (
     <div className="p-4 max-w-2xl mx-auto">
@@ -129,7 +129,7 @@ function Home() {
                 type="button"
                 variant="outline"
                 className="flex-1"
-                onClick={(e: any) => handleSubmit(e, true)}
+                onClick={(e) => handleSubmit(e, true)}
               >
                 Add More
               </Button>
@@ -138,5 +138,5 @@ function Home() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

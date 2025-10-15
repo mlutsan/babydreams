@@ -1,12 +1,12 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Button } from '~/components/ui/button'
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Button } from "~/components/ui/button";
 
-export const Route = createFileRoute('/settings')({
+export const Route = createFileRoute("/settings")({
   component: SettingsPage,
-})
+});
 
 function SettingsPage() {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
 
   return (
     <div className="p-4">
@@ -14,7 +14,7 @@ function SettingsPage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => navigate({ to: '/' })}
+          onClick={() => navigate({ to: "/" })}
           className="mr-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -25,5 +25,5 @@ function SettingsPage() {
       </div>
       <p className="text-muted-foreground">Settings form will go here (Phase 2)</p>
     </div>
-  )
+  );
 }
