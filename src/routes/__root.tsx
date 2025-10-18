@@ -13,6 +13,10 @@ import type { QueryClient } from "@tanstack/react-query";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "../styles.css?url";
+import { useGoogleAuth } from "~/hooks/useGoogleAuth";
+import { Toaster } from "~/components/ui/sonner";
+import GoogleSignInButton from "~/components/GoogleSignInButton";
+import { SettingsIcon } from "lucide-react";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
@@ -60,6 +64,10 @@ export const Route = createRootRouteWithContext<{
       { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
       { rel: "icon", href: "/favicon.ico" },
     ],
+    scripts: [{
+      src: "https://accounts.google.com/gsi/client",
+      async: true
+    }]
   }),
   errorComponent: (props) => {
     return (
@@ -81,6 +89,8 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode; }) {
+  const { user } = useGoogleAuth();
+
   return (
     <html>
       <head>
@@ -91,13 +101,20 @@ function RootDocument({ children }: { children: React.ReactNode; }) {
         <div className="flex flex-col h-screen bg-background">
           {/* Top Navbar */}
           <header className="bg-muted border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
-            <h1 className="text-xl font-semibold text-foreground">G-Finance</h1>
-            <Link to="/settings" className="p-2 hover:bg-muted/80 rounded-full transition-colors">
-              <svg className="w-5 h-5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </Link>
+            <div className="flex items-center gap-3">
+              <h1 className="text-xl font-semibold text-foreground">G-Finance</h1>
+              {user && (
+                <span className="text-sm text-muted-foreground">
+                  {user.name}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <GoogleSignInButton />
+              <Link to="/settings" className="p-2 hover:bg-muted/80 rounded-full transition-colors">
+                <SettingsIcon />
+              </Link>
+            </div>
           </header>
 
           {/* Main Content */}
@@ -136,6 +153,7 @@ function RootDocument({ children }: { children: React.ReactNode; }) {
             </div>
           </nav>
         </div>
+        <Toaster />
         <TanStackRouterDevtools position="bottom-right" />
         <ReactQueryDevtools buttonPosition="bottom-left" />
         <Scripts />
