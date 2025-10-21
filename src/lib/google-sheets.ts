@@ -1,17 +1,50 @@
 /**
- * Google Sheets API Client using @googleapis/sheets
- * Provides utilities for interacting with Google Sheets API
+ * Google Sheets API Client
+ * Provides utilities for interacting with Google Sheets API using direct fetch calls
  */
 
-import { sheets_v4, sheets } from "@googleapis/sheets";
-import { OAuth2Client } from "google-auth-library";
+import { getAccessToken } from "~/server/sa-auth";
 
-export interface GoogleTokens {
-  access_token: string;
-  refresh_token?: string;
-  expires_in: number;
-  token_type: string;
-  scope?: string;
+// Google Sheets API response types
+export interface SheetProperties {
+  title?: string;
+  sheetId?: number;
+  [key: string]: unknown;
+}
+
+export interface Sheet {
+  properties?: SheetProperties;
+  [key: string]: unknown;
+}
+
+export interface SpreadsheetProperties {
+  title?: string;
+  [key: string]: unknown;
+}
+
+export interface Spreadsheet {
+  properties?: SpreadsheetProperties;
+  sheets?: Sheet[];
+  [key: string]: unknown;
+}
+
+export interface ValueRange {
+  values?: unknown[][];
+  range?: string;
+  [key: string]: unknown;
+}
+
+export interface UpdateValuesResponse {
+  updatedRange?: string;
+  updatedRows?: number;
+  updatedColumns?: number;
+  updatedCells?: number;
+  [key: string]: unknown;
+}
+
+export interface AppendValuesResponse {
+  updates?: UpdateValuesResponse;
+  [key: string]: unknown;
 }
 
 /**
@@ -26,152 +59,96 @@ export function extractSpreadsheetId(url: string): string | null {
 }
 
 /**
- * Get tokens from request cookies
- */
-export function getTokensFromRequest(request: Request): GoogleTokens | null {
-  const cookies = request.headers.get("cookie") || "";
-  const tokensCookie = cookies
-    .split(";")
-    .find((c) => c.trim().startsWith("google_tokens="))
-    ?.split("=")[1];
-
-  if (!tokensCookie) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(decodeURIComponent(tokensCookie));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Google Sheets API client using @googleapis/sheets
+ * Google Sheets API client
  */
 export class GoogleSheetsClient {
-  private sheetsApi: sheets_v4.Sheets;
+  private accessToken: string;
   private spreadsheetId: string;
+  private baseUrl = "https://sheets.googleapis.com/v4/spreadsheets";
 
   constructor(accessToken: string, spreadsheetId: string) {
-    // Create OAuth2 client and set credentials
-    const authClient = new OAuth2Client();
-    authClient.setCredentials({
-      access_token: accessToken,
+    this.accessToken = accessToken;
+    this.spreadsheetId = spreadsheetId;
+  }
+
+  /**
+   * Create a client using service account credentials
+   */
+  static async createWithServiceAccount(
+    spreadsheetId: string
+  ): Promise<GoogleSheetsClient> {
+    const accessToken = await getAccessToken();
+    return new GoogleSheetsClient(accessToken, spreadsheetId);
+  }
+
+  /**
+   * Make an authenticated request to the Sheets API
+   */
+  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const url = `${this.baseUrl}/${this.spreadsheetId}${path}`;
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
     });
 
-    // Create sheets API instance with auth client
-    this.sheetsApi = sheets({
-      version: "v4",
-      auth: authClient,
-    });
-    this.spreadsheetId = spreadsheetId;
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Google Sheets API error: ${response.status} ${error}`);
+    }
+
+    return response.json();
   }
 
   /**
    * Get spreadsheet metadata
    */
-  async getSpreadsheetMetadata(): Promise<sheets_v4.Schema$Spreadsheet> {
-    try {
-      const response = await this.sheetsApi.spreadsheets.get({
-        spreadsheetId: this.spreadsheetId,
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch spreadsheet metadata: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async getSpreadsheetMetadata(): Promise<Spreadsheet> {
+    return this.request<Spreadsheet>("");
   }
 
   /**
    * Get values from a specific range
    */
-  async getValues(range: string): Promise<sheets_v4.Schema$ValueRange> {
-    try {
-      const response = await this.sheetsApi.spreadsheets.values.get({
-        spreadsheetId: this.spreadsheetId,
-        range,
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to fetch values: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async getValues(range: string): Promise<ValueRange> {
+    return this.request<ValueRange>(`/values/${encodeURIComponent(range)}`);
   }
 
   /**
    * Append values to a sheet
    */
-  async appendValues(range: string, values: unknown[][]): Promise<sheets_v4.Schema$AppendValuesResponse> {
-    try {
-      const response = await this.sheetsApi.spreadsheets.values.append({
-        spreadsheetId: this.spreadsheetId,
-        range,
-        valueInputOption: "USER_ENTERED",
-        requestBody: {
-          values,
-        },
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to append values: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async appendValues(range: string, values: unknown[][]): Promise<AppendValuesResponse> {
+    return this.request<AppendValuesResponse>(
+      `/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`,
+      {
+        method: "POST",
+        body: JSON.stringify({ values }),
+      }
+    );
   }
 
   /**
    * Update values in a specific range
    */
-  async updateValues(range: string, values: unknown[][]): Promise<sheets_v4.Schema$UpdateValuesResponse> {
-    try {
-      const response = await this.sheetsApi.spreadsheets.values.update({
-        spreadsheetId: this.spreadsheetId,
-        range,
-        valueInputOption: "USER_ENTERED",
-        requestBody: {
-          values,
-        },
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to update values: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async updateValues(range: string, values: unknown[][]): Promise<UpdateValuesResponse> {
+    return this.request<UpdateValuesResponse>(
+      `/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ values }),
+      }
+    );
   }
 
   /**
    * Clear values in a specific range
    */
-  async clearValues(range: string): Promise<sheets_v4.Schema$ClearValuesResponse> {
-    try {
-      const response = await this.sheetsApi.spreadsheets.values.clear({
-        spreadsheetId: this.spreadsheetId,
-        range,
-      });
-
-      return response.data;
-    } catch (error) {
-      throw new Error(`Failed to clear values: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  async clearValues(range: string): Promise<Record<string, unknown>> {
+    return this.request<Record<string, unknown>>(`/values/${encodeURIComponent(range)}:clear`, {
+      method: "POST",
+    });
   }
-}
-
-/**
- * Create a Google Sheets client from request
- */
-export function createSheetsClient(
-  request: Request,
-  spreadsheetUrl: string
-): GoogleSheetsClient | null {
-  const tokens = getTokensFromRequest(request);
-  if (!tokens) {
-    return null;
-  }
-
-  const spreadsheetId = extractSpreadsheetId(spreadsheetUrl);
-  if (!spreadsheetId) {
-    return null;
-  }
-
-  return new GoogleSheetsClient(tokens.access_token, spreadsheetId);
 }

@@ -1,14 +1,13 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { useAtom, useAtomValue } from "jotai";
+import { useAtom } from "jotai";
 import { toast } from "sonner";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { getMetadata } from "~/server/auth";
-import { sheetUrlAtom, googleTokenAtom, getValidAccessToken } from "~/lib/atoms";
-import { useGoogleAuth } from "~/hooks/useGoogleAuth";
+import { sheetUrlAtom, userNameAtom, generateRandomName } from "~/lib/atoms";
 
 export const Route = createFileRoute("/settings")({
   component: SettingsPage,
@@ -17,14 +16,16 @@ export const Route = createFileRoute("/settings")({
 function SettingsPage() {
   const navigate = useNavigate();
 
-  // Google auth hook
-  const { authState, user, requestSheetsAccess, logout } = useGoogleAuth();
-
   // Jotai atoms for persistent state
   const [sheetUrl, setSheetUrl] = useAtom(sheetUrlAtom);
-  const tokenData = useAtomValue(googleTokenAtom);
+  const [userName, setUserName] = useAtom(userNameAtom);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+
+  // Generate new random name
+  const handleGenerateNewName = () => {
+    setUserName(generateRandomName());
+  };
 
   const handleSaveAndTest = async () => {
     if (!sheetUrl) {
@@ -36,26 +37,13 @@ function SettingsPage() {
     setErrorMessage(null);
 
     try {
-      const accessToken = getValidAccessToken(tokenData);
-
-      // If no token, request authorization automatically
-      if (!accessToken) {
-        if (authState === "signed-out") {
-          throw new Error("Please sign in with Google first");
-        }
-
-        // Token missing or expired - request it again
-        console.log("Token missing/expired, requesting Sheets access...");
-        requestSheetsAccess();
-        throw new Error("Requesting authorization... Please approve the consent screen.");
-      }
 
       // Fetch sheet metadata using server function
-      const result = await getMetadata({ data: { sheetUrl, accessToken } });
+      const result = await getMetadata({ data: { sheetUrl } });
 
       // Display metadata in toast
       const sheetsInfo = result.sheets
-        .map((sheet) => sheet.title)
+        .map((sheet: { title: string; }) => sheet.title)
         .join(", ");
 
       toast.success("Sheet validated successfully!", {
@@ -87,36 +75,39 @@ function SettingsPage() {
       </div>
 
       <div className="space-y-6 max-w-2xl">
-        {user && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Account</CardTitle>
-              <CardDescription>Signed in with Google</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                {user.picture && (
-                  <img
-                    src={user.picture}
-                    alt={user.name}
-                    className="w-10 h-10 rounded-full"
-                  />
-                )}
-                <div>
-                  <p className="font-medium">{user.name}</p>
-                  <p className="text-sm text-muted-foreground">{user.email}</p>
-                </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Your Name</CardTitle>
+            <CardDescription>
+              This name will be used to identify your expenses
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="userName">Display Name</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="userName"
+                  placeholder="Enter your name"
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleGenerateNewName}
+                  type="button"
+                >
+                  🎲 Random
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                onClick={logout}
-                className="w-full"
-              >
-                Sign Out
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+              <p className="text-sm text-muted-foreground">
+                A random name has been generated for you, or you can enter your own
+              </p>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -141,24 +132,14 @@ function SettingsPage() {
 
             <div className="space-y-2">
               <div className="flex items-center gap-4 flex-wrap">
-                {authState === "signed-out" ? (
-                  <p className="text-sm text-muted-foreground">
-                    Please sign in with Google to continue
-                  </p>
-                ) : (
-                  <Button
-                    onClick={handleSaveAndTest}
-                    disabled={!sheetUrl || isConnecting}
-                  >
-                    {isConnecting ? "Validating..." : "Save & Test Connection"}
-                  </Button>
-                )}
 
-                {authState === "error" && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
-                    Authentication error. Please refresh the page.
-                  </p>
-                )}
+                <Button
+                  onClick={handleSaveAndTest}
+                  disabled={!sheetUrl || isConnecting}
+                >
+                  {isConnecting ? "Validating..." : "Save & Test Connection"}
+                </Button>
+
               </div>
 
               {errorMessage && (

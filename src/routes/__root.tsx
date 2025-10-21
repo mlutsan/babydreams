@@ -13,9 +13,7 @@ import type { QueryClient } from "@tanstack/react-query";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "../styles.css?url";
-import { useGoogleAuth } from "~/hooks/useGoogleAuth";
 import { Toaster } from "~/components/ui/sonner";
-import GoogleSignInButton from "~/components/GoogleSignInButton";
 import { SettingsIcon } from "lucide-react";
 
 export const Route = createRootRouteWithContext<{
@@ -31,7 +29,7 @@ export const Route = createRootRouteWithContext<{
         content: "width=device-width, initial-scale=1",
       },
       {
-        title: "G-Finance | Family Expense Tracker",
+        title: "Family Finance: Expense Tracker",
       },
       {
         name: "description",
@@ -89,7 +87,6 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode; }) {
-  const { user } = useGoogleAuth();
 
   return (
     <html>
@@ -102,15 +99,10 @@ function RootDocument({ children }: { children: React.ReactNode; }) {
           {/* Top Navbar */}
           <header className="bg-muted border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-foreground">G-Finance</h1>
-              {user && (
-                <span className="text-sm text-muted-foreground">
-                  {user.name}
-                </span>
-              )}
+              <h1 className="text-xl font-semibold text-foreground">Family Finance</h1>
+
             </div>
             <div className="flex items-center gap-2">
-              <GoogleSignInButton />
               <Link to="/settings" className="p-2 hover:bg-muted/80 rounded-full transition-colors">
                 <SettingsIcon />
               </Link>

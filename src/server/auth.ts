@@ -9,7 +9,7 @@ import { GoogleSheetsClient, extractSpreadsheetId } from "~/lib/google-sheets";
 /**
  * Verify Google access token by making a test API call
  */
-async function verifyAccessToken(accessToken: string): Promise<{ email?: string }> {
+async function verifyAccessToken(accessToken: string): Promise<{ email?: string; }> {
   try {
     const response = await fetch("https://www.googleapis.com/oauth2/v1/userinfo?alt=json", {
       headers: {
@@ -32,7 +32,7 @@ async function verifyAccessToken(accessToken: string): Promise<{ email?: string 
  * Check Google authentication status from client
  */
 export const checkGoogleAuthStatus = createServerFn({ method: "POST" })
-  .inputValidator((data: { accessToken?: string }) => data)
+  .inputValidator((data: { accessToken?: string; }) => data)
   .handler(async ({ data }) => {
     const { accessToken } = data;
 
@@ -63,20 +63,14 @@ export const checkGoogleAuthStatus = createServerFn({ method: "POST" })
  * Fetches spreadsheet information to verify access
  */
 export const getMetadata = createServerFn({ method: "POST" })
-  .inputValidator((data: { sheetUrl: string; accessToken: string }) => {
+  .inputValidator((data: { sheetUrl: string; }) => {
     if (!data.sheetUrl) {
       throw new Error("Sheet URL is required");
-    }
-    if (!data.accessToken) {
-      throw new Error("Authentication token is required");
     }
     return data;
   })
   .handler(async ({ data }) => {
-    const { sheetUrl, accessToken } = data;
-
-    // Verify the access token
-    await verifyAccessToken(accessToken);
+    const { sheetUrl } = data;
 
     // Extract spreadsheet ID from URL
     const spreadsheetId = extractSpreadsheetId(sheetUrl);
@@ -85,7 +79,7 @@ export const getMetadata = createServerFn({ method: "POST" })
     }
 
     // Create Google Sheets client with the access token
-    const client = new GoogleSheetsClient(accessToken, spreadsheetId);
+    const client = await GoogleSheetsClient.createWithServiceAccount(spreadsheetId);
 
     // Fetch metadata
     try {

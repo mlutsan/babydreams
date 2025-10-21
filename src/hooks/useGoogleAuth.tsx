@@ -42,20 +42,20 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
 
   useEffect(() => {
     // Check if user is already signed in
-    if (user) {
-      setAuthState("signed-in");
-    }
+    // if (user) {
+    //   setAuthState("signed-in");
+    // }
     // Initialize Google Identity Services for Authentication (sign-in)
-    google.accounts.id.initialize({
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
-      callback: handleCredentialResponse,
-      //auto_select: true,
-    });
+    // google.accounts.id.initialize({
+    //   client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+    //   callback: handleCredentialResponse,
+    //   //auto_select: true,
+    // });
 
-    // Show the One Tap prompt only if not signed in
-    if (!user) {
-      //google.accounts.id.prompt();
-    }
+    // // Show the One Tap prompt only if not signed in
+    // if (!user) {
+    //   google.accounts.id.prompt();
+    // }
 
     // Initialize OAuth2 token client for API access (Sheets API)
     tokenClient.current = google.accounts.oauth2.initTokenClient({
@@ -63,6 +63,8 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
       scope:
         "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/userinfo.email",
       callback: handleTokenResponse,
+      prompt: "",
+      login_hint: user?.email
     });
   }, []);
 
@@ -109,7 +111,10 @@ export function useGoogleAuth(): UseGoogleAuthReturn {
 
   function requestSheetsAccess() {
     if (tokenClient.current) {
-      tokenClient.current.requestAccessToken();
+      tokenClient.current.requestAccessToken({
+        login_hint: user?.email,
+        prompt: ""
+      });
     } else {
       console.error("Token client not initialized");
     }
