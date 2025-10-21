@@ -119,10 +119,17 @@ export class GoogleSheetsClient {
 
   /**
    * Append values to a sheet
+   * @param range - A1 notation of the range to search for a table (e.g., 'Expenses!A:F')
+   * @param values - 2D array of values to append
+   * @param insertDataOption - How to insert data: 'OVERWRITE' or 'INSERT_ROWS' (default)
    */
-  async appendValues(range: string, values: unknown[][]): Promise<AppendValuesResponse> {
+  async appendValues(
+    range: string,
+    values: unknown[][],
+    insertDataOption: "OVERWRITE" | "INSERT_ROWS" = "INSERT_ROWS"
+  ): Promise<AppendValuesResponse> {
     return this.request<AppendValuesResponse>(
-      `/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`,
+      `/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=${insertDataOption}`,
       {
         method: "POST",
         body: JSON.stringify({ values }),
