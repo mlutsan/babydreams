@@ -37,7 +37,7 @@ export const Route = createRootRouteWithContext<{
       },
       {
         name: "theme-color",
-        content: "#ffffff",
+        content: "#FF8C42",
         media: "(prefers-color-scheme: light)",
       },
       {
@@ -60,10 +60,11 @@ export const Route = createRootRouteWithContext<{
     ],
     links: [
       { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
       {
         rel: "apple-touch-icon",
         sizes: "180x180",
-        href: "/apple-touch-icon.png",
+        href: "/icon.svg",
       },
       {
         rel: "icon",

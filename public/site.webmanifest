@@ -1,4 +1,5 @@
 {
+  "id": "/",
   "name": "Family Finance",
   "short_name": "Finance",
   "description": "A lightweight expense tracking app for families",
