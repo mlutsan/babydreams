@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
 import {
   HeadContent,
-  Link,
   Outlet,
   Scripts,
   createRootRouteWithContext,
@@ -13,79 +12,100 @@ import type { QueryClient } from "@tanstack/react-query";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { NotFound } from "~/components/NotFound";
 import appCss from "../styles.css?url";
-import { Toaster } from "~/components/ui/sonner";
-import { SettingsIcon } from "lucide-react";
+import appCssMobile from "../styles-mobile.css?url";
 
-export const Route = createRootRouteWithContext<{
+import { MobileLayout } from "~/components/mobile/MobileLayout";
+import { DesktopLayout } from "~/components/desktop/DesktopLayout";
+
+interface RootContext {
   queryClient: QueryClient;
-}>()({
-  head: () => ({
-    meta: [
-      {
-        charSet: "utf-8",
-      },
-      {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-      },
-      {
-        title: "Family Finance: Expense Tracker",
-      },
-      {
-        name: "description",
-        content: "A lightweight expense tracking app for families with Google Sheets integration",
-      },
-      {
-        name: "theme-color",
-        content: "#FF8C42",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        name: "theme-color",
-        content: "#141414",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        name: "apple-mobile-web-app-capable",
-        content: "yes",
-      },
-      {
-        name: "apple-mobile-web-app-status-bar-style",
-        content: "default",
-      },
-      {
-        name: "mobile-web-app-capable",
-        content: "yes",
-      },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
-      {
-        rel: "apple-touch-icon",
-        sizes: "180x180",
-        href: "/icon.svg",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "32x32",
-        href: "/favicon-32x32.png",
-      },
-      {
-        rel: "icon",
-        type: "image/png",
-        sizes: "16x16",
-        href: "/favicon-16x16.png",
-      },
-      { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
-      { rel: "icon", href: "/favicon.ico" },
-    ],
-    scripts: [{
-      src: "https://accounts.google.com/gsi/client",
-      async: true
-    }]
-  }),
+  isMobile?: boolean;
+}
+
+export const Route = createRootRouteWithContext<RootContext>()({
+  beforeLoad: async () => {
+    // Detect device type - for SSR this would use request headers
+    // For now, we use client-side detection as a starting point
+    const isMobile = true;//typeof window !== "undefined" ? window.innerWidth < 768 : true;
+
+    return {
+      isMobile,
+    };
+  },
+  head: (ctx) => {
+    const isMobile = ctx.match.context.isMobile;
+    return ({
+      meta: [
+        {
+          charSet: "utf-8",
+        },
+        {
+          name: "viewport",
+          content:
+            "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
+        },
+        {
+          title: "Family Finance: Expense Tracker",
+        },
+        {
+          name: "description",
+          content:
+            "A lightweight expense tracking app for families with Google Sheets integration",
+        },
+        {
+          name: "theme-color",
+          content: "#FF8C42",
+          media: "(prefers-color-scheme: light)",
+        },
+        {
+          name: "theme-color",
+          content: "#141414",
+          media: "(prefers-color-scheme: dark)",
+        },
+        {
+          name: "apple-mobile-web-app-capable",
+          content: "yes",
+        },
+        {
+          name: "apple-mobile-web-app-status-bar-style",
+          content: "default",
+        },
+        {
+          name: "mobile-web-app-capable",
+          content: "yes",
+        },
+      ],
+      links: [
+        { rel: "stylesheet", href: isMobile ? appCssMobile : appCss },
+        { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
+        {
+          rel: "apple-touch-icon",
+          sizes: "180x180",
+          href: "/icon.svg",
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "32x32",
+          href: "/favicon-32x32.png",
+        },
+        {
+          rel: "icon",
+          type: "image/png",
+          sizes: "16x16",
+          href: "/favicon-16x16.png",
+        },
+        { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
+        { rel: "icon", href: "/favicon.ico" },
+      ],
+      scripts: [
+        {
+          src: "https://accounts.google.com/gsi/client",
+          async: true,
+        },
+      ],
+    });
+  },
   errorComponent: (props) => {
     return (
       <RootDocument>
@@ -106,70 +126,35 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode; }) {
+  const [isDark, setIsDark] = React.useState(false);
+  const context = Route.useRouteContext();
+  const isMobile = context.isMobile ?? true;
+
+  React.useEffect(() => {
+    // Check system preference for dark mode
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    setIsDark(mediaQuery.matches);
+
+    const handler = (e: MediaQueryListEvent) => setIsDark(e.matches);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, []);
+
+  const LayoutComponent = isMobile ? MobileLayout : DesktopLayout;
 
   return (
-    <html>
+    <html className={isDark ? "dark" : ""}>
       <head>
         <HeadContent />
       </head>
-
       <body>
-        <div className="flex flex-col h-screen bg-background">
-          {/* Top Navbar */}
-          <header className="bg-muted border-b border-border px-4 py-3 flex items-center justify-between shadow-sm">
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-semibold text-foreground">Family Finance</h1>
+        <LayoutComponent>{children}</LayoutComponent>
 
-            </div>
-            <div className="flex items-center gap-2">
-              <Link to="/settings" className="p-2 hover:bg-muted/80 rounded-full transition-colors">
-                <SettingsIcon />
-              </Link>
-            </div>
-          </header>
-
-          {/* Main Content */}
-          <main className="flex-1 overflow-auto">
-            {children}
-          </main>
-
-          {/* Bottom Tab Navigation */}
-          <nav className="bg-card border-t border-border px-4 py-2 shadow-lg">
-            <div className="flex justify-around items-center max-w-lg mx-auto">
-              <Link
-                to="/"
-                className="flex flex-col items-center py-2 px-4 rounded-lg transition-colors text-muted-foreground"
-                activeProps={{
-                  className: "bg-primary/10 text-primary",
-                }}
-                activeOptions={{ exact: true }}
-              >
-                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-                <span className="text-xs font-medium">Add Expense</span>
-              </Link>
-              <Link
-                to="/history"
-                className="flex flex-col items-center py-2 px-4 rounded-lg transition-colors text-muted-foreground"
-                activeProps={{
-                  className: "bg-primary/10 text-primary",
-                }}
-              >
-                <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <span className="text-xs font-medium">History</span>
-              </Link>
-            </div>
-          </nav>
-        </div>
-        <Toaster />
         <TanStackRouterDevtools position="bottom-right" />
         <ReactQueryDevtools buttonPosition="bottom-left" />
+
         <Scripts />
       </body>
-
     </html>
   );
 }

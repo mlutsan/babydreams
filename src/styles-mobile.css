@@ -1,0 +1,52 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'konsta/react/theme.css';
+
+/* Define layer order - mobile and desktop are isolated, base is shared */
+@layer mobile, desktop, base;
+
+@custom-variant dark (@media (prefers-color-scheme: dark));
+
+/* ==================== MOBILE LAYER (Konsta UI) ==================== */
+@layer mobile {
+
+  /* Mobile-specific utilities and overrides */
+  [data-ui-mode="mobile"] {
+    /* Mobile-only style overrides can go here if needed */
+  }
+}
+
+/* ==================== BASE LAYER (Shared Styles) ==================== */
+@layer base {
+  body {
+    @apply m-0;
+    font-family: -apple-system,
+      BlinkMacSystemFont,
+      'Segoe UI',
+      'Roboto',
+      'Oxygen',
+      'Ubuntu',
+      'Cantarell',
+      'Fira Sans',
+      'Droid Sans',
+      'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    /* Prevent text size adjustment on mobile */
+    -webkit-text-size-adjust: 100%;
+    /* Improve tap target responsiveness */
+    touch-action: manipulation;
+  }
+
+  /* Safe area support for notched devices */
+  html,
+  body {
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+
+  code {
+    font-family:
+      source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  }
+}
