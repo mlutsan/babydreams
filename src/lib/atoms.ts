@@ -6,27 +6,6 @@
 import { atomWithStorage } from "jotai/utils";
 
 /**
- * Random name generator for user display names
- */
-const ADJECTIVES = [
-  "Unknown", "Mysterious", "Curious", "Wandering", "Happy",
-  "Sleepy", "Grumpy", "Dancing", "Flying", "Sneaky",
-  "Brave", "Mighty", "Tiny", "Giant", "Swift"
-];
-
-const NOUNS = [
-  "Potato", "Banana", "Penguin", "Dragon", "Unicorn",
-  "Wizard", "Ninja", "Pirate", "Robot", "Panda",
-  "Cactus", "Muffin", "Narwhal", "Llama", "Walrus"
-];
-
-function generateRandomName(): string {
-  const adjective = ADJECTIVES[Math.floor(Math.random() * ADJECTIVES.length)];
-  const noun = NOUNS[Math.floor(Math.random() * NOUNS.length)];
-  return `${adjective} ${noun}`;
-}
-
-/**
  * Auth state atom - tracks Google authentication status
  */
 export type AuthState = "signed-out" | "signed-in" | "error";
@@ -49,17 +28,14 @@ export const googleUserAtom = atomWithStorage<GoogleUser | null>("google_user", 
 export const sheetUrlAtom = atomWithStorage<string>("sheetUrl", "");
 
 /**
- * User name atom - persists user's display name for expense tracking
- * Automatically initializes with a random name like "Unknown Potato"
+ * Baby name atom - persists baby's name
  */
-export const userNameAtom = atomWithStorage<string>("g-finance-user-name", generateRandomName(), undefined, {
-  getOnInit: true
-});
+export const babyNameAtom = atomWithStorage<string>("baby_name", "");
 
 /**
- * Export the generator function for the Random button in settings
+ * Baby birthdate atom - persists baby's birthdate in YYYY-MM-DD format
  */
-export { generateRandomName };
+export const babyBirthdateAtom = atomWithStorage<string>("baby_birthdate", "");
 
 /**
  * Google access token with expiry

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtom } from "jotai";
-import { sheetUrlAtom, userNameAtom } from "~/lib/atoms";
+import { sheetUrlAtom, babyNameAtom, babyBirthdateAtom } from "~/lib/atoms";
 import { SettingsForm as MobileSettingsForm } from "~/components/mobile/SettingsForm";
 import { SettingsForm as DesktopSettingsForm } from "~/components/desktop/SettingsForm";
 import { Route as RootRoute } from "./__root";
@@ -11,7 +11,8 @@ export const Route = createFileRoute("/settings")({
 
 function SettingsPage() {
   const [sheetUrl, setSheetUrl] = useAtom(sheetUrlAtom);
-  const [userName, setUserName] = useAtom(userNameAtom);
+  const [babyName, setBabyName] = useAtom(babyNameAtom);
+  const [babyBirthdate, setBabyBirthdate] = useAtom(babyBirthdateAtom);
   const { isMobile } = RootRoute.useRouteContext();
 
   const FormComponent = isMobile
@@ -21,9 +22,11 @@ function SettingsPage() {
   return (
     <FormComponent
       sheetUrl={sheetUrl}
-      userName={userName}
+      babyName={babyName}
+      babyBirthdate={babyBirthdate}
       setSheetUrl={setSheetUrl}
-      setUserName={setUserName}
+      setBabyName={setBabyName}
+      setBabyBirthdate={setBabyBirthdate}
     />
   );
 }

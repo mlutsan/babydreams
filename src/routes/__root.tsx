@@ -45,12 +45,12 @@ export const Route = createRootRouteWithContext<RootContext>()({
             "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
         },
         {
-          title: "Family Finance: Expense Tracker",
+          title: "Baby Dreams: Baby Activity Tracker",
         },
         {
           name: "description",
           content:
-            "A lightweight expense tracking app for families with Google Sheets integration",
+            "Track your baby's sleep and feeding schedule with Google Sheets integration",
         },
         {
           name: "theme-color",
@@ -77,11 +77,10 @@ export const Route = createRootRouteWithContext<RootContext>()({
       ],
       links: [
         { rel: "stylesheet", href: isMobile ? appCssMobile : appCss },
-        { rel: "icon", type: "image/svg+xml", href: "/icon.svg" },
         {
           rel: "apple-touch-icon",
           sizes: "180x180",
-          href: "/icon.svg",
+          href: "/apple-touch-icon.png",
         },
         {
           rel: "icon",
@@ -95,7 +94,7 @@ export const Route = createRootRouteWithContext<RootContext>()({
           sizes: "16x16",
           href: "/favicon-16x16.png",
         },
-        { rel: "manifest", href: "/site.webmanifest", color: "#fffff" },
+        { rel: "manifest", href: "/site.webmanifest" },
         { rel: "icon", href: "/favicon.ico" },
       ],
       scripts: [

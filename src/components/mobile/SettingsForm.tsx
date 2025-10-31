@@ -1,82 +1,90 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
-import { toast } from "sonner";
-import { Block, BlockTitle, List, ListInput, Button, Card, ListButton, ListItem } from "konsta/react";
+import { BlockTitle, List, ListInput, Button, Card, ListButton, ListItem, Toast } from "konsta/react";
+import { useToast } from "~/hooks/useToast";
 import { getMetadata } from "~/server/auth";
-import { generateRandomName } from "~/lib/atoms";
-import { Link2, Shuffle } from "lucide-react";
+import { getSettings, saveSettings } from "~/server/settings";
+import { Link2 } from "lucide-react";
 
 interface SettingsFormProps {
   sheetUrl: string;
-  userName: string;
+  babyName: string;
+  babyBirthdate: string;
   setSheetUrl: (url: string) => void;
-  setUserName: (name: string) => void;
+  setBabyName: (name: string) => void;
+  setBabyBirthdate: (date: string) => void;
 }
 
 export function SettingsForm({
   sheetUrl,
-  userName,
+  babyName,
+  babyBirthdate,
   setSheetUrl,
-  setUserName,
+  setBabyName,
+  setBabyBirthdate,
 }: SettingsFormProps) {
   const navigate = useNavigate();
+  const { toast: toastState, isOpen: toastOpen, success, error, close: closeToast } = useToast();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [restoreLink, setRestoreLink] = useState("");
 
-  const handleGenerateNewName = () => {
-    setUserName(generateRandomName());
-  };
-
-  const handleGenerateInviteLink = () => {
-    const baseUrl = window.location.origin;
-    const encodedSheet = encodeURIComponent(sheetUrl);
-    const inviteUrl = `${baseUrl}/invite?sheet=${encodedSheet}`;
-
-    navigator.clipboard.writeText(inviteUrl);
-    toast.success("Invite link copied!", {
-      description: "Share this link with your family members",
-      duration: 3000,
-    });
-  };
-
-  const handleGenerateSetupLink = () => {
-    const baseUrl = window.location.origin;
-    const encodedSheet = encodeURIComponent(sheetUrl);
-    const encodedName = encodeURIComponent(userName);
-    const setupUrl = `${baseUrl}/invite?sheet=${encodedSheet}&name=${encodedName}`;
-
-    navigator.clipboard.writeText(setupUrl);
-    toast.success("Setup link copied!", {
-      description: "Use this link to set up the app after installing to home screen",
-      duration: 4000,
-    });
-  };
+  // Load settings from Google Sheet when sheetUrl is set
+  useEffect(() => {
+    const load = async () => {
+      if (!sheetUrl) return;
+      setIsLoadingSettings(true);
+      try {
+        const res = await getSettings({ data: { sheetUrl } });
+        if (res.babyName) setBabyName(res.babyName);
+        if (res.babyBirthdate) setBabyBirthdate(res.babyBirthdate);
+      } catch (e) {
+        console.error("Failed to load settings from sheet", e);
+        error("Failed to load settings from sheet");
+      } finally {
+        setIsLoadingSettings(false);
+      }
+    };
+    load();
+  }, [sheetUrl, setBabyName, setBabyBirthdate]);
 
   const handleRestoreFromLink = () => {
     if (!restoreLink.trim()) {
-      toast.error("Please paste a setup link");
+      error("Please paste a setup link");
       return;
     }
 
     try {
       const url = new URL(restoreLink);
       const sheet = url.searchParams.get("sheet");
-      const name = url.searchParams.get("name");
 
       if (!sheet) {
-        toast.error("Invalid link", {
+        error("Invalid link", {
           description: "No sheet URL found in the link",
         });
         return;
       }
 
-      navigate({ to: "/invite", search: { sheet, name: name || "" } });
+      navigate({ to: "/invite", search: { sheet } });
     } catch {
-      toast.error("Invalid URL", {
+      error("Invalid URL", {
         description: "Please paste a valid setup link",
       });
     }
+  };
+
+  const handleGenerateSetupLink = () => {
+    const baseUrl = window.location.origin;
+    const encodedSheet = encodeURIComponent(sheetUrl);
+    const setupUrl = `${baseUrl}/invite?sheet=${encodedSheet}`;
+
+    navigator.clipboard.writeText(setupUrl);
+    success("Setup link copied!", {
+      description: "Use this link to set up the app after installing to home screen",
+      duration: 4000,
+    });
   };
 
   const handleSaveAndTest = async () => {
@@ -91,12 +99,22 @@ export function SettingsForm({
     try {
       const result = await getMetadata({ data: { sheetUrl } });
 
-      const sheetsInfo = result.sheets
-        .map((sheet: { title: string }) => sheet.title)
-        .join(", ");
+      // Check if required sheets exist
+      const requiredSheets = ["Settings", "Sleep", "Eat"];
+      const sheetTitles = result.sheets.map((s: { title: string; }) => s.title);
+      const missingSheets = requiredSheets.filter(
+        (req) => !sheetTitles.includes(req)
+      );
 
-      toast.success("Sheet validated successfully!", {
-        description: `${result.title} (${result.sheetCount} sheets: ${sheetsInfo})`,
+      if (missingSheets.length > 0) {
+        setErrorMessage(
+          `Missing required sheets: ${missingSheets.join(", ")}. Please create: Settings, Sleep, and Eat sheets.`
+        );
+        return;
+      }
+
+      success("Sheet validated successfully!", {
+        description: `${result.title} - All required sheets found (Settings, Sleep, Eat)`,
         duration: 5000,
       });
     } catch (error) {
@@ -106,6 +124,25 @@ export function SettingsForm({
       console.error("Sheet validation failed:", error);
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  const handleSaveProfile = async () => {
+    if (!sheetUrl) {
+      error("Please configure your Google Sheet URL first");
+      return;
+    }
+    setIsSavingSettings(true);
+    try {
+      await saveSettings({
+        data: { sheetUrl, babyName, babyBirthdate },
+      });
+      success("Baby profile saved to sheet");
+    } catch (e) {
+      console.error("Failed to save settings", e);
+      error("Failed to save to sheet");
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -137,22 +174,6 @@ export function SettingsForm({
           </div>
         </>
       )}
-      <BlockTitle>Your Name</BlockTitle>
-      <List strongIos insetIos>
-        <ListInput
-          label="Display Name"
-          type="text"
-          outline
-          placeholder="Enter your name"
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-          info="This name will be used to identify your expenses"
-        />
-        <ListButton onClick={handleGenerateNewName}>
-          <Shuffle className="w-5 h-5 mr-2" />
-          Generate Random Name
-        </ListButton>
-      </List>
 
       <BlockTitle>Google Sheets Integration</BlockTitle>
       <List inset strong>
@@ -180,6 +201,44 @@ export function SettingsForm({
         </ListButton>
       </List>
 
+
+      <BlockTitle>Baby Profile {isLoadingSettings ? "(loading...)" : ""}</BlockTitle>
+      <List strongIos insetIos>
+        <ListInput
+          label="Baby Name"
+          type="text"
+          outline
+          placeholder="Enter baby's name"
+          value={babyName}
+          onChange={(e) => setBabyName(e.target.value)}
+          info="Your baby's name will appear throughout the app"
+        />
+        <ListInput
+          label="Birthdate"
+          type="date"
+          outline
+          value={babyBirthdate}
+          onChange={(e) => setBabyBirthdate(e.target.value)}
+        />
+
+        {sheetUrl && <ListButton onClick={handleSaveProfile}>
+          {isSavingSettings ? "Saving..." : "Update"}
+        </ListButton>}
+      </List>
+
+      {/* {sheetUrl && (
+        <div className="p-2">
+          <Button
+            onClick={handleSaveProfile}
+            disabled={isSavingSettings}
+            className="w-full"
+            rounded
+          >
+            {isSavingSettings ? "Saving..." : "Save Baby Profile to Sheet"}
+          </Button>
+        </div>
+      )} */}
+
       {sheetUrl && (
         <>
           <BlockTitle>PWA Migration</BlockTitle>
@@ -194,8 +253,8 @@ export function SettingsForm({
                 <li>Add this app to your home screen</li>
                 <li>Copy link by tapping button below</li>
                 <li>
-                  Go to Settings in pinned app and paste the link into "Restore
-                  from Setup Link"
+                  Go to Settings in pinned app and paste the link into &quot;Restore
+                  from Setup Link&quot;
                 </li>
               </ol>
             </div>
@@ -209,27 +268,31 @@ export function SettingsForm({
               Copy Setup Link
             </Button>
           </Card>
-
-          <BlockTitle>Invite Family</BlockTitle>
-          <Block strong inset className="mb-24">
-            <div className="p-4 space-y-3">
-              <p className="text-sm opacity-70">
-                Generate an invite link with your Google Sheet configuration.
-                Family members can enter their name and start tracking expenses.
-              </p>
-            </div>
-            <Button
-              onClick={handleGenerateInviteLink}
-              className="w-full"
-              rounded
-              outline
-            >
-              <Link2 className="w-4 h-4 mr-2" />
-              Generate Invite Link
-            </Button>
-          </Block>
         </>
       )}
+
+      <Toast
+        position="center"
+        opened={toastOpen}
+        button={
+          <Button
+            rounded
+            clear
+            small
+            inline
+            onClick={closeToast}
+          >
+            Close
+          </Button>
+        }
+      >
+        <div className="shrink">
+          <div className="font-semibold">{toastState?.message}</div>
+          {toastState?.description && (
+            <div className="text-sm opacity-75 mt-1">{toastState.description}</div>
+          )}
+        </div>
+      </Toast>
     </div>
   );
 }

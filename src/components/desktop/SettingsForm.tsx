@@ -12,48 +12,34 @@ import {
   CardTitle,
 } from "~/components/ui/card";
 import { getMetadata } from "~/server/auth";
-import { generateRandomName } from "~/lib/atoms";
 import { Link2 } from "lucide-react";
 
 interface SettingsFormProps {
   sheetUrl: string;
-  userName: string;
+  babyName: string;
+  babyBirthdate: string;
   setSheetUrl: (url: string) => void;
-  setUserName: (name: string) => void;
+  setBabyName: (name: string) => void;
+  setBabyBirthdate: (date: string) => void;
 }
 
 export function SettingsForm({
   sheetUrl,
-  userName,
+  babyName,
+  babyBirthdate,
   setSheetUrl,
-  setUserName,
+  setBabyName,
+  setBabyBirthdate,
 }: SettingsFormProps) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [restoreLink, setRestoreLink] = useState("");
 
-  const handleGenerateNewName = () => {
-    setUserName(generateRandomName());
-  };
-
-  const handleGenerateInviteLink = () => {
-    const baseUrl = window.location.origin;
-    const encodedSheet = encodeURIComponent(sheetUrl);
-    const inviteUrl = `${baseUrl}/invite?sheet=${encodedSheet}`;
-
-    navigator.clipboard.writeText(inviteUrl);
-    toast.success("Invite link copied!", {
-      description: "Share this link with your family members",
-      duration: 3000,
-    });
-  };
-
   const handleGenerateSetupLink = () => {
     const baseUrl = window.location.origin;
     const encodedSheet = encodeURIComponent(sheetUrl);
-    const encodedName = encodeURIComponent(userName);
-    const setupUrl = `${baseUrl}/invite?sheet=${encodedSheet}&name=${encodedName}`;
+    const setupUrl = `${baseUrl}/invite?sheet=${encodedSheet}`;
 
     navigator.clipboard.writeText(setupUrl);
     toast.success("Setup link copied!", {
@@ -72,7 +58,6 @@ export function SettingsForm({
     try {
       const url = new URL(restoreLink);
       const sheet = url.searchParams.get("sheet");
-      const name = url.searchParams.get("name");
 
       if (!sheet) {
         toast.error("Invalid link", {
@@ -81,7 +66,7 @@ export function SettingsForm({
         return;
       }
 
-      navigate({ to: "/invite", search: { sheet, name: name || "" } });
+      navigate({ to: "/invite", search: { sheet } });
     } catch {
       toast.error("Invalid URL", {
         description: "Please paste a valid setup link",
@@ -105,8 +90,22 @@ export function SettingsForm({
         .map((sheet: { title: string }) => sheet.title)
         .join(", ");
 
+      // Check if required sheets exist
+      const requiredSheets = ["Settings", "Sleep", "Eat"];
+      const sheetTitles = result.sheets.map((s: { title: string }) => s.title);
+      const missingSheets = requiredSheets.filter(
+        (req) => !sheetTitles.includes(req)
+      );
+
+      if (missingSheets.length > 0) {
+        setErrorMessage(
+          `Missing required sheets: ${missingSheets.join(", ")}. Please create: Settings, Sleep, and Eat sheets.`
+        );
+        return;
+      }
+
       toast.success("Sheet validated successfully!", {
-        description: `${result.title} (${result.sheetCount} sheets: ${sheetsInfo})`,
+        description: `${result.title} - All required sheets found (Settings, Sleep, Eat)`,
         duration: 5000,
       });
     } catch (error) {
@@ -182,33 +181,34 @@ export function SettingsForm({
 
         <Card>
           <CardHeader>
-            <CardTitle>Your Name</CardTitle>
+            <CardTitle>Baby Profile</CardTitle>
             <CardDescription>
-              This name will be used to identify your expenses
+              Information about your baby
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="userName">Display Name</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="userName"
-                  placeholder="Enter your name"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  onClick={handleGenerateNewName}
-                  type="button"
-                >
-                  🎲 Random
-                </Button>
-              </div>
+              <Label htmlFor="babyName">Baby Name</Label>
+              <Input
+                id="babyName"
+                placeholder="Enter baby's name"
+                value={babyName}
+                onChange={(e) => setBabyName(e.target.value)}
+              />
               <p className="text-sm text-muted-foreground">
-                A random name has been generated for you, or you can enter your
-                own
+                Your baby's name will appear throughout the app
+              </p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="babyBirthdate">Birthdate</Label>
+              <Input
+                id="babyBirthdate"
+                type="date"
+                value={babyBirthdate}
+                onChange={(e) => setBabyBirthdate(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Baby's date of birth (YYYY-MM-DD)
               </p>
             </div>
           </CardContent>
@@ -218,7 +218,7 @@ export function SettingsForm({
           <CardHeader>
             <CardTitle>Google Sheets Integration</CardTitle>
             <CardDescription>
-              Connect to your Google Sheet to save expenses
+              Connect to your Google Sheet to track baby activity
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -231,7 +231,7 @@ export function SettingsForm({
                 onChange={(e) => setSheetUrl(e.target.value)}
               />
               <p className="text-sm text-muted-foreground">
-                Paste the URL of your Google Sheet
+                Paste the URL of your Google Sheet with Settings, Sleep, and Eat sheets
               </p>
             </div>
 
@@ -299,26 +299,25 @@ export function SettingsForm({
 
             <Card>
               <CardHeader>
-                <CardTitle>Invite Family Members</CardTitle>
+                <CardTitle>Sheet Structure</CardTitle>
                 <CardDescription>
-                  Share your expense tracker with family members
+                  Required sheet structure for Baby Dreams
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Generate an invite link that includes your Google Sheet
-                  configuration. When someone opens this link, they&apos;ll be
-                  prompted to enter their name and will be ready to track
-                  expenses in the same sheet.
-                </p>
-                <Button
-                  onClick={handleGenerateInviteLink}
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                >
-                  <Link2 className="w-4 h-4 mr-2" />
-                  Generate & Copy Invite Link
-                </Button>
+                <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-3">
+                  <p className="text-sm font-medium text-foreground">
+                    Required Sheets:
+                  </p>
+                  <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+                    <li><strong>Settings</strong>: Setting | Value</li>
+                    <li><strong>Sleep</strong>: Added Date | Date | Start Time | What | Cycle | Length</li>
+                    <li><strong>Eat</strong>: Added Date | Date | Start Time | Volume | Cycle</li>
+                  </ul>
+                  <p className="text-sm text-muted-foreground mt-4">
+                    Make sure your spreadsheet has all three sheets with the correct column headers.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </>

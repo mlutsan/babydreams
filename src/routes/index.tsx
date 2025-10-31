@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { sheetUrlAtom, userNameAtom } from "~/lib/atoms";
-import { AddExpenseForm as MobileAddExpenseForm } from "~/components/mobile/AddExpenseForm";
-import { AddExpenseForm as DesktopAddExpenseForm } from "~/components/desktop/AddExpenseForm";
+import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Route as RootRoute } from "./__root";
+import { Page, Navbar, Block, BlockTitle } from "konsta/react";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -11,12 +10,31 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
-  const userName = useAtomValue(userNameAtom);
+  const babyName = useAtomValue(babyNameAtom);
   const { isMobile } = RootRoute.useRouteContext();
 
-  const FormComponent = isMobile
-    ? MobileAddExpenseForm
-    : DesktopAddExpenseForm;
+  if (!sheetUrl) {
+    return (
+      <Page>
+        <Navbar title="Baby Dreams" />
+        <Block strong inset className="text-center">
+          <BlockTitle>Welcome to Baby Dreams</BlockTitle>
+          <p>Please configure your Google Sheet in Settings first.</p>
+        </Block>
+      </Page>
+    );
+  }
 
-  return <FormComponent sheetUrl={sheetUrl} userName={userName} />;
+  return (
+    <Page>
+      <Navbar title="Sleep Tracker" />
+      <Block strong inset className="text-center">
+        <BlockTitle>Sleep Tracking</BlockTitle>
+        <p>Sleep tracking will be implemented in Phase 2.</p>
+        <p className="text-sm text-gray-500 mt-4">
+          {babyName && `Tracking for: ${babyName}`}
+        </p>
+      </Block>
+    </Page>
+  );
 }

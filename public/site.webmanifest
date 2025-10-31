@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Family Finance",
-  "short_name": "Finance",
-  "description": "A lightweight expense tracking app for families",
+  "name": "Baby Dreams",
+  "short_name": "Baby Dreams",
+  "description": "Track your baby's sleep and feeding schedule",
   "icons": [
     {
       "src": "/android-chrome-192x192.png",
@@ -23,5 +23,5 @@
   "orientation": "portrait",
   "start_url": "/",
   "scope": "/",
-  "categories": ["finance", "productivity"]
+  "categories": ["health", "lifestyle", "productivity"]
 }
