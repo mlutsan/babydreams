@@ -117,7 +117,7 @@ function Home() {
                 {displayName} is {isSleeping ? "Sleeping" : "Awake"}
               </div>
               <div className="text-lg opacity-70">
-                since {formatDuration(sleepState.duration)}
+                since {sleepState.startTime} ({formatDuration(sleepState.duration)})
               </div>
             </>
           ) : (
