@@ -46,7 +46,16 @@ export default [
           "args": "after-used",
           "argsIgnorePattern": "^_",
         },
-      ]
+      ],
+      "curly": [
+        "warn",
+        "all"
+      ],
+      "@stylistic/brace-style": [
+        "warn",
+        "1tbs",
+        { "allowSingleLine": false }
+      ],
     }
   }
 ];

@@ -25,7 +25,9 @@ export const googleUserAtom = atomWithStorage<GoogleUser | null>("google_user", 
 /**
  * Sheet URL atom - persists Google Sheets URL
  */
-export const sheetUrlAtom = atomWithStorage<string>("sheetUrl", "");
+export const sheetUrlAtom = atomWithStorage<string>("sheetUrl", "", undefined, {
+  getOnInit: true
+});
 
 /**
  * Baby name atom - persists baby's name

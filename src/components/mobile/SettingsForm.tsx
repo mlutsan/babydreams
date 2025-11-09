@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { BlockTitle, List, ListInput, Button, Card, ListButton, ListItem, Toast } from "konsta/react";
 import { useToast } from "~/hooks/useToast";
-import { getMetadata } from "~/server/auth";
-import { getSettings, saveSettings } from "~/server/settings";
+import { getSheetMetadata } from "~/server/proxy";
+import { getSettings, saveSettings } from "~/lib/settings-service";
 import { Link2 } from "lucide-react";
 
 interface SettingsFormProps {
@@ -34,12 +34,18 @@ export function SettingsForm({
   // Load settings from Google Sheet when sheetUrl is set
   useEffect(() => {
     const load = async () => {
-      if (!sheetUrl) return;
+      if (!sheetUrl) {
+        return;
+      }
       setIsLoadingSettings(true);
       try {
-        const res = await getSettings({ data: { sheetUrl } });
-        if (res.babyName) setBabyName(res.babyName);
-        if (res.babyBirthdate) setBabyBirthdate(res.babyBirthdate);
+        const res = await getSettings(sheetUrl);
+        if (res.babyName) {
+          setBabyName(res.babyName);
+        }
+        if (res.babyBirthdate) {
+          setBabyBirthdate(res.babyBirthdate);
+        }
       } catch (e) {
         console.error("Failed to load settings from sheet", e);
         error("Failed to load settings from sheet");
@@ -97,11 +103,25 @@ export function SettingsForm({
     setErrorMessage(null);
 
     try {
-      const result = await getMetadata({ data: { sheetUrl } });
+      const metadata = (await getSheetMetadata({ data: { sheetUrl } })) as {
+        properties?: { title?: string };
+        sheets?: Array<{ properties?: { title?: string; sheetId?: number } }>;
+      };
+
+      // Transform metadata to match expected format
+      const result = {
+        title: metadata.properties?.title || "Unknown",
+        sheetCount: metadata.sheets?.length || 0,
+        sheets:
+          metadata.sheets?.map((sheet: { properties?: { title?: string; sheetId?: number } }) => ({
+            title: sheet.properties?.title || "Untitled",
+            sheetId: sheet.properties?.sheetId || 0,
+          })) || [],
+      };
 
       // Check if required sheets exist
       const requiredSheets = ["Settings", "Sleep", "Eat"];
-      const sheetTitles = result.sheets.map((s: { title: string; }) => s.title);
+      const sheetTitles = result.sheets.map((s: { title: string }) => s.title);
       const missingSheets = requiredSheets.filter(
         (req) => !sheetTitles.includes(req)
       );
@@ -135,7 +155,9 @@ export function SettingsForm({
     setIsSavingSettings(true);
     try {
       await saveSettings({
-        data: { sheetUrl, babyName, babyBirthdate },
+        sheetUrl,
+        babyName,
+        babyBirthdate,
       });
       success("Baby profile saved to sheet");
     } catch (e) {

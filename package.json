@@ -22,6 +22,7 @@
     "@tanstack/react-start": "^1.132.56",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dayjs": "^1.11.19",
     "eslint-plugin-unused-imports": "^4.2.0",
     "jotai": "^2.15.0",
     "konsta": "^5.0.3",

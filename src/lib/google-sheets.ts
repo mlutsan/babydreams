@@ -1,9 +1,18 @@
 /**
- * Google Sheets API Client
+ * Google Sheets API Client (Server-side only)
  * Provides utilities for interacting with Google Sheets API using direct fetch calls
  */
 
 import { getAccessToken } from "~/server/sa-auth";
+
+// Re-export shared utilities for backward compatibility
+export {
+  serialNumberToDate,
+  serialNumberToTime,
+  dateToSerialNumber,
+  formatDateYYYYMMDD,
+  extractSpreadsheetId,
+} from "./sheets-utils";
 
 // Google Sheets API response types
 export interface SheetProperties {
@@ -47,16 +56,6 @@ export interface AppendValuesResponse {
   [key: string]: unknown;
 }
 
-/**
- * Extract spreadsheet ID from various Google Sheets URL formats
- */
-export function extractSpreadsheetId(url: string): string | null {
-  // Handle different URL formats:
-  // https://docs.google.com/spreadsheets/d/SPREADSHEET_ID/edit...
-  // https://docs.google.com/spreadsheets/d/SPREADSHEET_ID
-  const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-  return match ? match[1] : null;
-}
 
 /**
  * Google Sheets API client
@@ -112,9 +111,18 @@ export class GoogleSheetsClient {
 
   /**
    * Get values from a specific range
+   * Uses UNFORMATTED_VALUE with SERIAL_NUMBER for dates
+   * Dates come back as Excel serial numbers (days since Dec 30, 1899)
+   * Use serialNumberToDate() helper to convert to JS Date objects
    */
   async getValues(range: string): Promise<ValueRange> {
-    return this.request<ValueRange>(`/values/${encodeURIComponent(range)}`);
+    const params = new URLSearchParams({
+      valueRenderOption: "UNFORMATTED_VALUE",
+      dateTimeRenderOption: "SERIAL_NUMBER",
+    });
+    return this.request<ValueRange>(
+      `/values/${encodeURIComponent(range)}?${params.toString()}`
+    );
   }
 
   /**
@@ -122,14 +130,20 @@ export class GoogleSheetsClient {
    * @param range - A1 notation of the range to search for a table (e.g., 'Expenses!A:F')
    * @param values - 2D array of values to append
    * @param insertDataOption - How to insert data: 'OVERWRITE' or 'INSERT_ROWS' (default)
+   * @param valueInputOption - How to interpret input:
+   *   - 'USER_ENTERED' (default): Parse values as if user typed them (dates/numbers/formulas)
+   *   - 'RAW': Store exactly as-is with no parsing
+   *
+   * Default is USER_ENTERED so dates like "2025-10-30" are stored as proper dates
    */
   async appendValues(
     range: string,
     values: unknown[][],
-    insertDataOption: "OVERWRITE" | "INSERT_ROWS" = "INSERT_ROWS"
+    insertDataOption: "OVERWRITE" | "INSERT_ROWS" = "INSERT_ROWS",
+    valueInputOption: "RAW" | "USER_ENTERED" = "USER_ENTERED"
   ): Promise<AppendValuesResponse> {
     return this.request<AppendValuesResponse>(
-      `/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED&insertDataOption=${insertDataOption}`,
+      `/values/${encodeURIComponent(range)}:append?valueInputOption=${valueInputOption}&insertDataOption=${insertDataOption}`,
       {
         method: "POST",
         body: JSON.stringify({ values }),
@@ -139,10 +153,19 @@ export class GoogleSheetsClient {
 
   /**
    * Update values in a specific range
+   * @param valueInputOption - How to interpret input:
+   *   - 'USER_ENTERED' (default): Parse values as if user typed them (dates/numbers/formulas)
+   *   - 'RAW': Store exactly as-is with no parsing
+   *
+   * Default is USER_ENTERED so dates like "2025-10-30" are stored as proper dates
    */
-  async updateValues(range: string, values: unknown[][]): Promise<UpdateValuesResponse> {
+  async updateValues(
+    range: string,
+    values: unknown[][],
+    valueInputOption: "RAW" | "USER_ENTERED" = "USER_ENTERED"
+  ): Promise<UpdateValuesResponse> {
     return this.request<UpdateValuesResponse>(
-      `/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      `/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`,
       {
         method: "PUT",
         body: JSON.stringify({ values }),

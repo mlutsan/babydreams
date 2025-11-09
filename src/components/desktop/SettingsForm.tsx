@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "~/components/ui/card";
-import { getMetadata } from "~/server/auth";
+import { getSheetMetadata } from "~/server/proxy";
 import { Link2 } from "lucide-react";
 
 interface SettingsFormProps {
@@ -84,7 +84,21 @@ export function SettingsForm({
     setErrorMessage(null);
 
     try {
-      const result = await getMetadata({ data: { sheetUrl } });
+      const metadata = (await getSheetMetadata({ data: { sheetUrl } })) as {
+        properties?: { title?: string };
+        sheets?: Array<{ properties?: { title?: string; sheetId?: number } }>;
+      };
+
+      // Transform metadata to match expected format
+      const result = {
+        title: metadata.properties?.title || "Unknown",
+        sheetCount: metadata.sheets?.length || 0,
+        sheets:
+          metadata.sheets?.map((sheet: { properties?: { title?: string; sheetId?: number } }) => ({
+            title: sheet.properties?.title || "Untitled",
+            sheetId: sheet.properties?.sheetId || 0,
+          })) || [],
+      };
 
       const sheetsInfo = result.sheets
         .map((sheet: { title: string }) => sheet.title)
