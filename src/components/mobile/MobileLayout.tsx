@@ -1,9 +1,10 @@
 import { ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { App, KonstaProvider, Navbar, Page, Tabbar, TabbarLink, ToolbarPane } from "konsta/react";
+import { App, KonstaProvider, Navbar, NavbarBackLink, Page, Tabbar, TabbarLink, ToolbarPane } from "konsta/react";
 import { Moon, Settings } from "lucide-react";
 import { Route as IndexRoute } from "~/routes/index";
 import { Route as SettingsRoute } from "~/routes/settings";
+import { Route as HistoryRoute } from "~/routes/history";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -13,18 +14,28 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   const router = useRouterState();
   const navigate = useNavigate();
 
+  // Determine navbar configuration based on current route
+  const isHistoryPage = router.location.pathname === HistoryRoute.to;
+  const navbarTitle = isHistoryPage ? "Sleep History" : "Baby Dreams";
+  const showBackButton = isHistoryPage;
+
   return (
     <div data-ui-mode="mobile">
       <KonstaProvider theme="ios">
         <App theme="ios" safeAreas>
           <Page>
-            <Navbar title="Baby Dreams" />
+            <Navbar
+              title={navbarTitle}
+              left={showBackButton ? (
+                <NavbarBackLink onClick={() => window.history.back()} ></NavbarBackLink>
+              ) : undefined}
+            />
             {children}
 
             <Tabbar labels icons className="left-0 bottom-0 fixed">
               <ToolbarPane>
                 <TabbarLink
-                  active={router.location.pathname === IndexRoute.to}
+                  active={router.location.pathname === IndexRoute.to || router.location.pathname == HistoryRoute.to}
                   icon={<Moon className="w-6 h-6" />}
                   label="Sleep"
                   onClick={() => {

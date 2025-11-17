@@ -11,9 +11,6 @@ import {
   Preloader,
   Segmented,
   SegmentedButton,
-  Navbar,
-  Page,
-  NavbarBackLink,
 } from "konsta/react";
 import { Moon } from "lucide-react";
 import { getHistory } from "~/lib/history-service";
@@ -44,7 +41,9 @@ function History() {
 
   // Filter stats based on selected period
   const filteredStats = useMemo(() => {
-    if (!allStats) return [];
+    if (!allStats) {
+      return [];
+    }
 
     if (selectedPeriod === "recent") {
       // Show last 7 days
@@ -58,31 +57,19 @@ function History() {
   // Show loading while atoms hydrate from storage
   if (!isHydrated) {
     return (
-      <Page>
-        <Navbar
-          title="History"
-          left={<NavbarBackLink onClick={() => window.history.back()} />}
-        />
-        <Block className="text-center py-8">
-          <Preloader />
-        </Block>
-      </Page>
+      <Block className="text-center py-8">
+        <Preloader />
+      </Block>
     );
   }
 
   // After hydration, check if sheet URL is configured
   if (!sheetUrl) {
     return (
-      <Page>
-        <Navbar
-          title="History"
-          left={<NavbarBackLink onClick={() => window.history.back()} />}
-        />
-        <Block strong inset className="text-center">
-          <BlockTitle>No Sheet Configured</BlockTitle>
-          <p>Please configure your Google Sheet in Settings first.</p>
-        </Block>
-      </Page>
+      <Block strong inset className="text-center">
+        <BlockTitle>No Sheet Configured</BlockTitle>
+        <p>Please configure your Google Sheet in Settings first.</p>
+      </Block>
     );
   }
 
@@ -90,11 +77,7 @@ function History() {
   const statsToDisplay = [...filteredStats].reverse();
 
   return (
-    <Page>
-      <Navbar
-        title="Sleep History"
-        left={<NavbarBackLink onClick={() => window.history.back()} />}
-      />
+    <>
 
       {/* Period Selector */}
       <Block>
@@ -123,10 +106,9 @@ function History() {
           <BlockTitle>Daily Sleep Stats</BlockTitle>
           <List strongIos insetIos>
             {statsToDisplay.map((stat, index) => {
-              const dateRange = `${stat.startDatetime.format("MMM D")}${
-                !stat.startDatetime.isSame(stat.endDatetime, "day")
-                  ? ` - ${stat.endDatetime.format("MMM D")}`
-                  : ""
+              const dateRange = `${stat.startDatetime.format("MMM D")}${!stat.startDatetime.isSame(stat.endDatetime, "day")
+                ? ` - ${stat.endDatetime.format("MMM D")}`
+                : ""
               }`;
 
               return (
@@ -185,6 +167,6 @@ function History() {
           </div>
         </Block>
       )}
-    </Page>
+    </>
   );
 }
