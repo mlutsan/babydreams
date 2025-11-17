@@ -1,14 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
-import { Moon, Sun } from "lucide-react";
-import { getSleepScreenData, addSleepEntry } from "~/lib/sleep-service";
+import { Moon, Sun, History as HistoryIcon } from "lucide-react";
+import { getHistory } from "~/lib/history-service";
+import { addSleepEntry } from "~/lib/sleep-service";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { SleepModal } from "~/components/mobile/SleepModal";
 import { useToast } from "~/hooks/useToast";
+import dayjs from "dayjs";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -27,23 +29,77 @@ function Home() {
     setIsHydrated(true);
   }, []);
 
-  // Query for sleep screen data (only after hydration)
-  const { data: sleepData, isLoading } = useQuery({
-    queryKey: ["sleepScreenData", sheetUrl],
-    queryFn: () => getSleepScreenData(sheetUrl),
+  // Query for all history data (shared with history page)
+  const { data: allStats, isLoading } = useQuery({
+    queryKey: ["history", sheetUrl],
+    queryFn: () => getHistory(sheetUrl),
     enabled: isHydrated && !!sheetUrl,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     refetchInterval: 60000, // Refresh every minute
   });
 
-  // Extract state and stats from combined data
-  const sleepState = sleepData?.state;
-  const todayStats = sleepData?.stats;
+  // Find today's stat from the history
+  const todayStat = useMemo(() => {
+    if (!allStats || allStats.length === 0) {
+      return null;
+    }
+
+    const now = dayjs();
+    // Find the stat where endDatetime is today
+    return allStats.find(stat => stat.endDatetime.isSame(now, "day")) || null;
+  }, [allStats]);
+
+  // Extract state and stats from today's data using the last entry
+  const sleepState = useMemo(() => {
+    if (!todayStat || !todayStat.entries || todayStat.entries.length === 0) {
+      return null;
+    }
+
+    const now = dayjs();
+    const lastEntry = todayStat.entries[todayStat.entries.length - 1];
+
+    if (lastEntry.endTime === null) {
+      // Baby is currently sleeping
+      const sleepStartTime = lastEntry.startTime.format("HH:mm");
+      const durationMinutes = Math.round((now.unix() - lastEntry.realDatetime.unix()) / 60);
+
+      return {
+        isActive: true,
+        startTime: sleepStartTime,
+        duration: durationMinutes,
+        cycle: lastEntry.cycle,
+        date: lastEntry.date.format("YYYY-MM-DD"),
+        awakeStartTime: null,
+        awakeDuration: 0,
+      };
+    } else {
+      // Baby is awake
+      const awakeStartTime = lastEntry.endTime.format("HH:mm");
+      const awakeStart = lastEntry.date.startOf("day").add(lastEntry.endTime);
+      const awakeDuration = Math.round((now.unix() - awakeStart.unix()) / 60);
+
+      return {
+        isActive: false,
+        startTime: null,
+        duration: 0,
+        cycle: lastEntry.cycle,
+        date: lastEntry.date.format("YYYY-MM-DD"),
+        awakeStartTime,
+        awakeDuration,
+      };
+    }
+  }, [todayStat]);
+
+  const todayStats = todayStat ? {
+    sleepMinutes: todayStat.totalSleepMinutes,
+    awakeMinutes: todayStat.awakeMinutes,
+  } : null;
 
   // Mutation for tracking
   const trackMutation = useMutation({
     mutationFn: addSleepEntry,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["sleepScreenData"] });
+      queryClient.invalidateQueries({ queryKey: ["history"] });
       success("Sleep tracked successfully!");
       setModalOpen(false);
     },
@@ -59,16 +115,10 @@ function Home() {
       return;
     }
 
-    // Determine new state (opposite of current state)
-    const newState = sleepState?.state === "Sleep" ? "Wake" : "Sleep";
-
     trackMutation.mutate({
-      today: new Date(),
       sheetUrl,
-      endTime: new Date(),
       timeAgo,
       cycle,
-      newState,
     });
   };
 
@@ -91,7 +141,7 @@ function Home() {
     );
   }
 
-  const isSleeping = sleepState?.state === "Sleep";
+  const isSleeping = sleepState?.isActive || false;
   const displayName = babyName || "Baby";
 
   if (isLoading) {
@@ -111,13 +161,25 @@ function Home() {
           {sleepState?.isActive ? (
             <>
               <div className="text-5xl">
-                {isSleeping ? <Moon className="w-12 h-12" /> : <Sun className="w-12 h-12" />}
+                <Moon className="w-12 h-12" />
               </div>
               <div className="text-xl font-semibold">
-                {displayName} is {isSleeping ? "Sleeping" : "Awake"}
+                {displayName} is Sleeping
               </div>
               <div className="text-lg opacity-70">
                 since {sleepState.startTime} ({formatDuration(sleepState.duration)})
+              </div>
+            </>
+          ) : sleepState?.awakeStartTime ? (
+            <>
+              <div className="text-5xl">
+                <Sun className="w-12 h-12" />
+              </div>
+              <div className="text-xl font-semibold">
+                {displayName} is Awake
+              </div>
+              <div className="text-lg opacity-70">
+                since {sleepState.awakeStartTime} ({formatDuration(sleepState.awakeDuration)})
               </div>
             </>
           ) : (
@@ -125,7 +187,7 @@ function Home() {
               <div className="text-5xl">
                 <Moon className="w-16 h-16 opacity-30" />
               </div>
-              <div className="text-xl font-semibold">No active tracking</div>
+              <div className="text-xl font-semibold">No sleep data yet</div>
               <div className="text-sm opacity-70">Start tracking below</div>
             </>
           )}
@@ -152,6 +214,21 @@ function Home() {
         </div>
       </Block>
 
+      {/* History Link */}
+      <Block inset>
+        <Link to="/history">
+          <Button
+            large
+            rounded
+            outline
+            className="w-full"
+          >
+            <HistoryIcon className="w-5 h-5 mr-2" />
+            View History
+          </Button>
+        </Link>
+      </Block>
+
       {/* Action Button */}
       <Block inset>
         <Button
@@ -173,7 +250,7 @@ function Home() {
       <SleepModal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        currentState={sleepState?.state || null}
+        isSleeping={isSleeping}
         currentCycle={sleepState?.cycle || "Day"}
         onConfirm={handleTrackSleep}
       />

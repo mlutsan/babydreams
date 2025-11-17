@@ -20,7 +20,7 @@ import dayjs from "dayjs";
 interface SleepModalProps {
   opened: boolean;
   onClose: () => void;
-  currentState: "Sleep" | "Wake" | null;
+  isSleeping: boolean; // Is baby currently sleeping?
   currentCycle: "Day" | "Night";
   onConfirm: (timeAgo: number, cycle: "Day" | "Night") => void;
 }
@@ -28,7 +28,7 @@ interface SleepModalProps {
 export function SleepModal({
   opened,
   onClose,
-  currentState,
+  isSleeping,
   currentCycle,
   onConfirm,
 }: SleepModalProps) {
@@ -75,8 +75,8 @@ export function SleepModal({
     onConfirm(calculatedTimeAgo, cycle);
   };
 
-  // Determine the action text based on current state
-  const actionText = currentState === "Sleep" ? "wake up" : "fall asleep";
+  // Determine the action text based on sleep state
+  const actionText = isSleeping ? "wake up" : "fall asleep";
   const modalTitle = `When did baby ${actionText}?`;
 
   return (
