@@ -9,6 +9,7 @@ import { getHistory } from "~/lib/history-service";
 import { addSleepEntry } from "~/lib/sleep-service";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { SleepModal } from "~/components/mobile/SleepModal";
+import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useToast } from "~/hooks/useToast";
 import dayjs from "dayjs";
 
@@ -212,7 +213,20 @@ function Home() {
             </div>
           </div>
         </div>
+
+        {todayStat && todayStat.entries.length > 0 && (
+          <>
+            <ResponsiveSleepTimeline
+              entries={todayStat.entries}
+              startDatetime={todayStat.startDatetime}
+              height={80}
+            />
+          </>
+        )}
       </Block>
+
+
+
 
       {/* History Link */}
       <Block inset>

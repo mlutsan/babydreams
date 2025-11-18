@@ -101,18 +101,9 @@ function dateTimeToDatetime(
 function calculateAwakeMinutes(
   startDatetime: Dayjs,
   endDatetime: Dayjs,
-  totalSleepMinutes: number,
-  now: Dayjs
+  totalSleepMinutes: number
 ): number {
-  // Check if this stat is for today
-  const isToday = endDatetime.isSame(now, "day");
-
-  // Calculate total elapsed time for this logical day
-  const elapsedMinutes = isToday
-    ? now.diff(startDatetime, "minutes")  // Today: from start to now
-    : endDatetime.diff(startDatetime, "minutes");  // Past: from start to end
-
-  // Awake = elapsed time - sleep time
+  const elapsedMinutes = endDatetime.diff(startDatetime, "minutes");  // Past: from start to end
   return Math.max(0, elapsedMinutes - totalSleepMinutes);
 }
 
@@ -154,17 +145,28 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
 
     for (const entry of allEntries) {
 
-      // Calculate sleep duration
+      // Calculate sleep duration and actual end datetime
       let durationMinutes = 0;
       let isActive = false;
+      let entryEndDatetime: Dayjs;
 
       if (entry.endTime === null) {
         // Active sleep - calculate to now
         isActive = true;
         durationMinutes = Math.round((now.unix() - entry.realDatetime.unix()) / 60);
+        entryEndDatetime = now;
       } else {
         // Completed sleep
         durationMinutes = calculateSleepDuration(entry.startTime, entry.endTime);
+
+        // Calculate actual end datetime (same logic as SleepTimeline)
+        entryEndDatetime = entry.realDatetime.startOf("day").add(entry.endTime);
+        const startMinutes = Math.floor(entry.startTime.asMinutes());
+        const endMinutes = Math.floor(entry.endTime.asMinutes());
+        if (endMinutes < startMinutes) {
+          // Sleep crossed midnight
+          entryEndDatetime = entryEndDatetime.add(1, "day");
+        }
       }
 
       // Determine if we need to create a new stat entry
@@ -187,8 +189,13 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
       }
 
       if (shouldCreateNewStat) {
-        // Push previous stat if exists
+        // Calculate awake time for previous stat before pushing
         if (currentStat) {
+          currentStat.awakeMinutes = calculateAwakeMinutes(
+            currentStat.startDatetime,
+            currentStat.endDatetime,
+            currentStat.totalSleepMinutes
+          );
           stats.push(currentStat);
         }
 
@@ -201,17 +208,12 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
           newStartDatetime = dateTimeToDatetime(entry.date, previousEntry.endTime, entry.cycle);
         }
 
-        // Create new stat entry
+        // Create new stat entry (awake minutes calculated later)
         currentStat = {
           startDatetime: newStartDatetime,
-          endDatetime: entry.realDatetime,
+          endDatetime: entryEndDatetime,
           totalSleepMinutes: durationMinutes,
-          awakeMinutes: calculateAwakeMinutes(
-            newStartDatetime,
-            entry.realDatetime,
-            durationMinutes,
-            now
-          ),
+          awakeMinutes: 0, // Calculated when stat is complete
           daySleepMinutes: entry.cycle === "Day" ? durationMinutes : 0,
           nightSleepMinutes: entry.cycle === "Night" ? durationMinutes : 0,
           sessionCount: 1,
@@ -219,15 +221,9 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
           entries: [entry]
         };
       } else if (currentStat) {
-        // Add to current stat
-        currentStat.endDatetime = entry.realDatetime;
+        // Add to current stat (awake time calculated after loop)
+        currentStat.endDatetime = entryEndDatetime;
         currentStat.totalSleepMinutes += durationMinutes;
-        currentStat.awakeMinutes = calculateAwakeMinutes(
-          currentStat.startDatetime,
-          entry.realDatetime,
-          currentStat.totalSleepMinutes,
-          now
-        );
         currentStat.sessionCount += 1;
         currentStat.hasActiveSleep = isActive;
         currentStat.entries.push(entry);
@@ -242,8 +238,13 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
       previousEntry = entry;
     }
 
-    // Push final stat
+    // Calculate awake time and push final stat
     if (currentStat) {
+      currentStat.awakeMinutes = calculateAwakeMinutes(
+        currentStat.startDatetime,
+        currentStat.endDatetime,
+        currentStat.totalSleepMinutes
+      );
       stats.push(currentStat);
     }
 

@@ -15,6 +15,7 @@ import {
 import { Moon } from "lucide-react";
 import { getHistory } from "~/lib/history-service";
 import { formatDuration } from "~/lib/date-utils";
+import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/history")({
@@ -118,6 +119,15 @@ function History() {
                   after={formatDuration(stat.totalSleepMinutes)}
                   subtitle={
                     <div className="space-y-2 mt-2">
+                      {/* Timeline Visualization */}
+                      <div className="w-full">
+                        <ResponsiveSleepTimeline
+                          entries={stat.entries}
+                          startDatetime={stat.startDatetime}
+                          height={60}
+                        />
+                      </div>
+
                       {/* Total Stats */}
                       <div className="flex gap-4 text-xs">
                         <span>😴 {formatDuration(stat.totalSleepMinutes)}</span>
