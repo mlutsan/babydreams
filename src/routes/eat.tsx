@@ -9,6 +9,7 @@ import { getEatHistory, addEatEntry } from "~/lib/eat-service";
 import { getHistory } from "~/lib/history-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
+import { EatStats } from "~/components/mobile/EatStats";
 import { useToast } from "~/hooks/useToast";
 import dayjs from "dayjs";
 
@@ -181,6 +182,16 @@ function Eat() {
           </div>
         </div>
       </Block>
+
+      {/* Weekly Trends & Insights */}
+      {allStats && allStats.length > 0 && (
+        <>
+          <BlockTitle>Insights</BlockTitle>
+          <Block strong inset>
+            <EatStats dailyStats={allStats} />
+          </Block>
+        </>
+      )}
 
       {/* Feeding Overview Chart */}
       {allStats && allStats.length > 0 && (

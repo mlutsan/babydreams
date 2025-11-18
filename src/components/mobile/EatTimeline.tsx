@@ -131,10 +131,12 @@ export function EatTimeline({
   // Handle tooltip show/hide
   const handleMouseMove = (event: React.MouseEvent | React.TouchEvent, entry: EatEntry) => {
     const point = localPoint(event) || { x: 0, y: 0 };
+    // Offset tooltip above the touch point (60px above for better visibility)
+    const tooltipOffset = 60;
     showTooltip({
       tooltipData: entry,
       tooltipLeft: point.x,
-      tooltipTop: point.y,
+      tooltipTop: point.y - tooltipOffset,
     });
   };
 
