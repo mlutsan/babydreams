@@ -6,11 +6,7 @@
     "nodejs_compat"
   ],
   "main": "@tanstack/react-start/server-entry",
-  "env": {},
-  "routes": [
-    {
-      "pattern": "app.finance-tracker.com",
-      "custom_domain": true
-    }
-  ]
+  "vars": {
+    "SA_EMAIL": "familyfinance@familyfinance-475219.iam.gserviceaccount.com"
+  }
 }

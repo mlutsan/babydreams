@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as InviteRouteImport } from './routes/invite'
 import { Route as HistoryRouteImport } from './routes/history'
+import { Route as EatRouteImport } from './routes/eat'
 import { Route as IndexRouteImport } from './routes/index'
 
 const SettingsRoute = SettingsRouteImport.update({
@@ -29,6 +30,11 @@ const HistoryRoute = HistoryRouteImport.update({
   path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EatRoute = EatRouteImport.update({
+  id: '/eat',
+  path: '/eat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/eat': typeof EatRoute
   '/history': typeof HistoryRoute
   '/invite': typeof InviteRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/eat': typeof EatRoute
   '/history': typeof HistoryRoute
   '/invite': typeof InviteRoute
   '/settings': typeof SettingsRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/eat': typeof EatRoute
   '/history': typeof HistoryRoute
   '/invite': typeof InviteRoute
   '/settings': typeof SettingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/history' | '/invite' | '/settings'
+  fullPaths: '/' | '/eat' | '/history' | '/invite' | '/settings'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/history' | '/invite' | '/settings'
-  id: '__root__' | '/' | '/history' | '/invite' | '/settings'
+  to: '/' | '/eat' | '/history' | '/invite' | '/settings'
+  id: '__root__' | '/' | '/eat' | '/history' | '/invite' | '/settings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EatRoute: typeof EatRoute
   HistoryRoute: typeof HistoryRoute
   InviteRoute: typeof InviteRoute
   SettingsRoute: typeof SettingsRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/eat': {
+      id: '/eat'
+      path: '/eat'
+      fullPath: '/eat'
+      preLoaderRoute: typeof EatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EatRoute: EatRoute,
   HistoryRoute: HistoryRoute,
   InviteRoute: InviteRoute,
   SettingsRoute: SettingsRoute,

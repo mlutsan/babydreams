@@ -1,10 +1,11 @@
 import { ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { App, KonstaProvider, Navbar, NavbarBackLink, Page, Tabbar, TabbarLink, ToolbarPane } from "konsta/react";
-import { Moon, Settings } from "lucide-react";
+import { Milk, Moon, Settings } from "lucide-react";
 import { Route as IndexRoute } from "~/routes/index";
 import { Route as SettingsRoute } from "~/routes/settings";
 import { Route as HistoryRoute } from "~/routes/history";
+import { Route as EatRoute } from "~/routes/eat";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -16,7 +17,15 @@ export function MobileLayout({ children }: MobileLayoutProps) {
 
   // Determine navbar configuration based on current route
   const isHistoryPage = router.location.pathname === HistoryRoute.to;
-  const navbarTitle = isHistoryPage ? "Sleep History" : "Baby Dreams";
+  const isEatPage = router.location.pathname === EatRoute.to;
+
+  let navbarTitle = "Baby Dreams";
+  if (isHistoryPage) {
+    navbarTitle = "Sleep History";
+  } else if (isEatPage) {
+    navbarTitle = "Feeding";
+  }
+
   const showBackButton = isHistoryPage;
 
   return (
@@ -41,6 +50,16 @@ export function MobileLayout({ children }: MobileLayoutProps) {
                   onClick={() => {
                     navigate({
                       to: IndexRoute.to,
+                    });
+                  }}
+                />
+                <TabbarLink
+                  active={router.location.pathname === EatRoute.to}
+                  icon={<Milk className="w-6 h-6" />}
+                  label="Eat"
+                  onClick={() => {
+                    navigate({
+                      to: EatRoute.to,
                     });
                   }}
                 />
