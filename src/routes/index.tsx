@@ -47,7 +47,8 @@ function Home() {
 
     const now = dayjs();
     // Find the stat where endDatetime is today
-    return allStats.find(stat => stat.endDatetime.isSame(now, "day")) || null;
+    const today = allStats.find(stat => stat.startDatetime.isSame(now, "day")) || null;
+    return today;
   }, [allStats]);
 
   // Extract state and stats from today's data using the last entry
