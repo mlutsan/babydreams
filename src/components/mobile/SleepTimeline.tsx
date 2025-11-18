@@ -59,37 +59,83 @@ export function SleepTimeline({
     zIndex: 1000
   });
 
-  // Transform entries into timeline segments
+  // Transform entries into timeline segments (sleep + awake)
   const segments = useMemo(() => {
     const now = dayjs();
     const result: TimelineSegment[] = [];
+    const dayStart = startDatetime; // When the day started (from component prop)
 
     entries.forEach((entry, index) => {
-      const startDatetime = entry.realDatetime;
+      const sleepStart = entry.realDatetime;
 
-      let endDatetime: dayjs.Dayjs;
+      let sleepEnd: dayjs.Dayjs;
       if (entry.endTime === null) {
         // Active sleep - end time is now
-        endDatetime = now;
+        sleepEnd = now;
       } else {
         // Completed sleep - calculate end datetime using same base as realDatetime
-        endDatetime = entry.realDatetime.startOf("day").add(entry.endTime);
+        sleepEnd = entry.realDatetime.startOf("day").add(entry.endTime);
 
         // Adjust for midnight crossover (when end time < start time)
         const startMinutes = Math.floor(entry.startTime.asMinutes());
         const endMinutes = Math.floor(entry.endTime.asMinutes());
         if (endMinutes < startMinutes) {
           // Sleep crossed midnight - end time is next day
-          endDatetime = endDatetime.add(1, "day");
+          sleepEnd = sleepEnd.add(1, "day");
         }
       }
 
-      const durationMinutes = endDatetime.diff(startDatetime, "minutes");
+      const durationMinutes = sleepEnd.diff(sleepStart, "minutes");
 
+      // Add awake segment before this sleep
+      if (index === 0) {
+        // Check if there's awake time from day start to first sleep
+        const awakeDuration = sleepStart.diff(dayStart, "minutes");
+
+        if (awakeDuration > 0) {
+          result.push({
+            id: "awake-start",
+            startTime: dayStart.toDate(),
+            endTime: sleepStart.toDate(),
+            type: "awake",
+            cycle: entry.cycle,
+            durationMinutes: awakeDuration,
+            isActive: false,
+          });
+        }
+      } else {
+        // Add awake segment between previous sleep and this one
+        const prevSegment = result[result.length - 1];
+
+        if (prevSegment.type === "sleep") {
+          const awakeStart = dayjs(prevSegment.endTime);
+          const awakeDuration = sleepStart.diff(awakeStart, "minutes");
+
+          let cycle = prevSegment.cycle;
+
+          if (prevSegment.cycle == "Night" && entry.cycle == "Day") {
+            cycle = "Day";
+          }
+
+          if (awakeDuration > 0) {
+            result.push({
+              id: `awake-${index}`,
+              startTime: awakeStart.toDate(),
+              endTime: sleepStart.toDate(),
+              type: "awake",
+              cycle: cycle,
+              durationMinutes: awakeDuration,
+              isActive: false,
+            });
+          }
+        }
+      }
+
+      // Add sleep segment
       result.push({
         id: `sleep-${index}`,
-        startTime: startDatetime.toDate(),
-        endTime: endDatetime.toDate(),
+        startTime: sleepStart.toDate(),
+        endTime: sleepEnd.toDate(),
         type: "sleep",
         cycle: entry.cycle,
         durationMinutes,
@@ -98,7 +144,7 @@ export function SleepTimeline({
     });
 
     return result;
-  }, [entries]);
+  }, [entries, startDatetime]);
 
   // Define time range: start to max(start + 12h, last entry end + 1h)
   const { timelineStart, timelineEnd, durationHours } = useMemo(() => {
@@ -150,10 +196,16 @@ export function SleepTimeline({
 
   // Color mapping
   const getColor = (segment: TimelineSegment) => {
-    if (segment.cycle === "Day") {
-      return "#93c5fd"; // light blue for day
+    if (segment.type === "awake") {
+      // Awake periods - lighter/grayed colors
+      return segment.cycle === "Day"
+        ? "#e8ff96"
+        : "#cbd5e1"; // light gray for night awake
     } else {
-      return "#003ea1"; // darker blue for night
+      // Sleep periods
+      return segment.cycle === "Day"
+        ? "#93c5fd" // light blue for day sleep
+        : "#003ea1"; // darker blue for night sleep
     }
   };
 
@@ -233,7 +285,6 @@ export function SleepTimeline({
                   width={barWidth}
                   height={barHeight}
                   fill={getColor(segment)}
-                  rx={3}
                   stroke={segment.isActive ? "#9fb1ab" : "transparent"}
                   strokeWidth={segment.isActive ? 2 : 0}
                   onMouseMove={(event) => handleMouseMove(event, segment)}
@@ -273,7 +324,7 @@ export function SleepTimeline({
         >
           <div className="text-sm space-y-1">
             <div className="font-semibold text-gray-900 dark:text-gray-100">
-              {tooltipData.cycle} Sleep
+              {tooltipData.type === "awake" ? "Awake" : tooltipData.cycle + " Sleep"}
               {tooltipData.isActive && " (Active)"}
             </div>
             <div className="text-gray-600 dark:text-gray-400">
