@@ -162,6 +162,7 @@ function Eat() {
             ) : (
               <div className="text-sm opacity-40">No data</div>
             )}
+
           </div>
 
           {/* Yesterday */}
@@ -181,6 +182,17 @@ function Eat() {
             )}
           </div>
         </div>
+
+        <Button
+          large
+          rounded
+          onClick={() => setModalOpen(true)}
+          disabled={addMutation.isPending}
+          className="w-full bg-amber-500 active:bg-amber-600 mt-4"
+        >
+          <Plus className="w-5 h-5 mr-2" />
+          {addMutation.isPending ? "Nom nom nom..." : "Add Meal"}
+        </Button>
       </Block>
 
       {/* Weekly Trends & Insights */}
@@ -205,16 +217,7 @@ function Eat() {
 
       {/* Add Feeding Button */}
       <Block inset>
-        <Button
-          large
-          rounded
-          onClick={() => setModalOpen(true)}
-          disabled={addMutation.isPending}
-          className="w-full bg-amber-500 active:bg-amber-600"
-        >
-          <Plus className="w-5 h-5 mr-2" />
-          {addMutation.isPending ? "Nom nom nom..." : "Add Meal"}
-        </Button>
+
       </Block>
 
       {/* Eat Modal */}

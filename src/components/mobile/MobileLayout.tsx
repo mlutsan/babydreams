@@ -29,56 +29,54 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   const showBackButton = isHistoryPage;
 
   return (
-    <div data-ui-mode="mobile">
-      <KonstaProvider theme="ios">
-        <App theme="ios" safeAreas>
-          <Page>
-            <Navbar
-              title={navbarTitle}
-              left={showBackButton ? (
-                <NavbarBackLink onClick={() => window.history.back()} ></NavbarBackLink>
-              ) : undefined}
-            />
-            {children}
+    <KonstaProvider theme="ios">
+      <App theme="ios" safeAreas>
+        <Page className="pb-10">
+          <Navbar
+            title={navbarTitle}
+            left={showBackButton ? (
+              <NavbarBackLink onClick={() => window.history.back()} ></NavbarBackLink>
+            ) : undefined}
+          />
+          {children}
 
-            <Tabbar labels icons className="left-0 bottom-0 fixed">
-              <ToolbarPane>
-                <TabbarLink
-                  active={router.location.pathname === IndexRoute.to || router.location.pathname == HistoryRoute.to}
-                  icon={<Moon className="w-6 h-6" />}
-                  label="Sleep"
-                  onClick={() => {
-                    navigate({
-                      to: IndexRoute.to,
-                    });
-                  }}
-                />
-                <TabbarLink
-                  active={router.location.pathname === EatRoute.to}
-                  icon={<Milk className="w-6 h-6" />}
-                  label="Eat"
-                  onClick={() => {
-                    navigate({
-                      to: EatRoute.to,
-                    });
-                  }}
-                />
-                <TabbarLink
-                  active={router.location.pathname === SettingsRoute.to}
-                  icon={<Settings className="w-6 h-6" />}
-                  label="Settings"
-                  onClick={() => {
-                    navigate({
-                      to: SettingsRoute.to,
-                    });
-                  }}
-                />
-              </ToolbarPane>
+          <Tabbar labels icons className="left-0 bottom-0 fixed">
+            <ToolbarPane>
+              <TabbarLink
+                active={router.location.pathname === IndexRoute.to || router.location.pathname == HistoryRoute.to}
+                icon={<Moon className="w-6 h-6" />}
+                label="Sleep"
+                onClick={() => {
+                  navigate({
+                    to: IndexRoute.to,
+                  });
+                }}
+              />
+              <TabbarLink
+                active={router.location.pathname === EatRoute.to}
+                icon={<Milk className="w-6 h-6" />}
+                label="Eat"
+                onClick={() => {
+                  navigate({
+                    to: EatRoute.to,
+                  });
+                }}
+              />
+              <TabbarLink
+                active={router.location.pathname === SettingsRoute.to}
+                icon={<Settings className="w-6 h-6" />}
+                label="Settings"
+                onClick={() => {
+                  navigate({
+                    to: SettingsRoute.to,
+                  });
+                }}
+              />
+            </ToolbarPane>
 
-            </Tabbar>
-          </Page>
-        </App>
-      </KonstaProvider>
-    </div>
+          </Tabbar>
+        </Page>
+      </App>
+    </KonstaProvider>
   );
 }

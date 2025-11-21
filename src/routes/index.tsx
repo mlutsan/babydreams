@@ -119,7 +119,25 @@ function Home() {
             </>
           )}
         </div>
+        <Button
+          large
+          rounded
+          onClick={() => setModalOpen(true)}
+          disabled={trackMutation.isPending}
+          className="w-full mt-4"
+        >
+          {trackMutation.isPending
+            ? "Tracking..."
+            : isSleeping
+              ? "Woke up"
+              : "Fall asleep"}
+        </Button>
         {/* </Card> */}
+      </Block>
+
+      {/* Action Button */}
+      <Block inset>
+
       </Block>
 
       {/* Today's Stats */}
@@ -169,22 +187,7 @@ function Home() {
         </Link>
       </Block>
 
-      {/* Action Button */}
-      <Block inset>
-        <Button
-          large
-          rounded
-          onClick={() => setModalOpen(true)}
-          disabled={trackMutation.isPending}
-          className="w-full"
-        >
-          {trackMutation.isPending
-            ? "Tracking..."
-            : isSleeping
-              ? "Woke up"
-              : "Fall asleep"}
-        </Button>
-      </Block>
+
 
       {/* Sleep Modal */}
       <SleepModal
