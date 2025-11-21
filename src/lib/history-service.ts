@@ -39,6 +39,7 @@ export type DayHistory = {
 
 export type DailyStat = {
   // Date range of this logical day
+  //logicalDate: Dayjs;
   startDatetime: Dayjs;
   endDatetime: Dayjs;
   // Sleep totals
