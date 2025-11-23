@@ -4,7 +4,7 @@
   "sideEffects": false,
   "type": "module",
   "scripts": {
-    "dev": "vite dev",
+    "dev": "vite dev --host",
     "build": "vite build && tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
@@ -32,7 +32,7 @@
     "dayjs": "^1.11.19",
     "eslint-plugin-unused-imports": "^4.2.0",
     "jotai": "^2.15.0",
-    "konsta": "^5.0.3",
+    "konsta": "^5.0.4",
     "lucide-react": "^0.545.0",
     "next-themes": "^0.4.6",
     "react": "^19.0.0",

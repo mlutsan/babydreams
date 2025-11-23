@@ -8,15 +8,6 @@
 @custom-variant dark (@media (prefers-color-scheme: dark));
 
 
-/* ==================== MOBILE LAYER (Konsta UI) ==================== */
-@layer mobile {
-
-  /* Mobile-specific utilities and overrides */
-  [data-ui-mode="mobile"] {
-    /* Mobile-only style overrides can go here if needed */
-  }
-}
-
 /* ==================== BASE LAYER (Shared Styles) ==================== */
 @layer base {
   body {

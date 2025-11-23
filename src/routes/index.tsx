@@ -1,3 +1,4 @@
+"use client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState } from "react";

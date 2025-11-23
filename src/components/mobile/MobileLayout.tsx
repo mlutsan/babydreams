@@ -6,6 +6,7 @@ import { Route as IndexRoute } from "~/routes/index";
 import { Route as SettingsRoute } from "~/routes/settings";
 import { Route as HistoryRoute } from "~/routes/history";
 import { Route as EatRoute } from "~/routes/eat";
+import { PullToRefresh } from "~/components/PullToRefresh";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -18,6 +19,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   // Determine navbar configuration based on current route
   const isHistoryPage = router.location.pathname === HistoryRoute.to;
   const isEatPage = router.location.pathname === EatRoute.to;
+  const isIndexPage = router.location.pathname === IndexRoute.to;
 
   let navbarTitle = "Baby Dreams";
   if (isHistoryPage) {
@@ -27,6 +29,15 @@ export function MobileLayout({ children }: MobileLayoutProps) {
   }
 
   const showBackButton = isHistoryPage;
+
+  // Determine which queries to invalidate on pull-to-refresh
+  const queryKeys: string[][] = [];
+  if (isIndexPage || isHistoryPage) {
+    queryKeys.push(["history"]);
+  }
+  if (isEatPage) {
+    queryKeys.push(["history"], ["eatHistory"]);
+  }
 
   return (
     <KonstaProvider theme="ios">
@@ -38,7 +49,9 @@ export function MobileLayout({ children }: MobileLayoutProps) {
               <NavbarBackLink onClick={() => window.history.back()} ></NavbarBackLink>
             ) : undefined}
           />
-          {children}
+          <PullToRefresh queryKeys={queryKeys}>
+            {children}
+          </PullToRefresh>
 
           <Tabbar labels icons className="left-0 bottom-0 fixed">
             <ToolbarPane>
