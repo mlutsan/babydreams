@@ -1,16 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { Plus } from "lucide-react";
-import { getEatHistory, addEatEntry } from "~/lib/eat-service";
+import { getEatHistory } from "~/lib/eat-service";
 import { getHistory } from "~/lib/history-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
 import { EatStats } from "~/components/mobile/EatStats";
-import { useToast } from "~/hooks/useToast";
+import { useEatMutation } from "~/hooks/useEatMutation";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/eat")({
@@ -19,8 +19,6 @@ export const Route = createFileRoute("/eat")({
 
 function Eat() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
-  const queryClient = useQueryClient();
-  const { success, error } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
@@ -65,20 +63,8 @@ function Eat() {
     return { todayStat: today || null, yesterdayStat: yest || null };
   }, [allStats]);
 
-  // Mutation for adding entry
-  const addMutation = useMutation({
-    mutationFn: addEatEntry,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["eatHistory"] });
-      success("Meal recorded successfully!");
-      setModalOpen(false);
-    },
-    onError: (err) => {
-      error("Failed to record meal", {
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
-    },
-  });
+  // Use the reusable eat mutation hook
+  const addMutation = useEatMutation();
 
   // Determine current cycle date from sleep stats
   const currentCycleDate = useMemo(() => {
@@ -107,11 +93,18 @@ function Eat() {
       return;
     }
 
-    addMutation.mutate({
-      sheetUrl,
-      volume,
-      cycleDate: currentCycleDate,
-    });
+    addMutation.mutate(
+      {
+        sheetUrl,
+        volume,
+        cycleDate: currentCycleDate,
+      },
+      {
+        onSuccess: () => {
+          setModalOpen(false);
+        },
+      }
+    );
   };
 
   // Show loading while atoms hydrate from storage

@@ -1,16 +1,10 @@
-import { useState, useCallback } from "react";
-
-export interface ToastMessage {
-  id: string;
-  message: string;
-  description?: string;
-  type: "success" | "error";
-  duration?: number;
-}
+import { useCallback } from "react";
+import { useAtom } from "jotai";
+import { toastAtom, toastOpenAtom, type ToastMessage } from "~/lib/atoms";
 
 export function useToast() {
-  const [toast, setToast] = useState<ToastMessage | null>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  const [toast, setToast] = useAtom(toastAtom);
+  const [isOpen, setIsOpen] = useAtom(toastOpenAtom);
 
   const showToast = useCallback((
     message: string,
@@ -31,30 +25,29 @@ export function useToast() {
 
     setToast(newToast);
     setIsOpen(true);
-
     // Auto-close after duration
     setTimeout(() => {
       setIsOpen(false);
     }, newToast.duration);
-  }, []);
+  }, [setToast, setIsOpen]);
 
   const success = useCallback((
     message: string,
-    options?: { description?: string; duration?: number }
+    options?: { description?: string; duration?: number; }
   ) => {
     showToast(message, { ...options, type: "success" });
   }, [showToast]);
 
   const error = useCallback((
     message: string,
-    options?: { description?: string; duration?: number }
+    options?: { description?: string; duration?: number; }
   ) => {
     showToast(message, { ...options, type: "error" });
   }, [showToast]);
 
   const close = useCallback(() => {
     setIsOpen(false);
-  }, []);
+  }, [setIsOpen]);
 
   return {
     toast,

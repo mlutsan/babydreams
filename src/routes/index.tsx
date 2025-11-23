@@ -2,16 +2,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { Moon, Sun, History as HistoryIcon } from "lucide-react";
-import { addSleepEntry } from "~/lib/sleep-service";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { SleepModal } from "~/components/mobile/SleepModal";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
-import { useToast } from "~/hooks/useToast";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useSleepMutation } from "~/hooks/useSleepMutation";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -20,44 +18,18 @@ export const Route = createFileRoute("/")({
 function Home() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const babyName = useAtomValue(babyNameAtom);
-  const queryClient = useQueryClient();
-  const { success, error } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
 
   // Use the shared sleep history hook
-  const { todayStat, sleepState, isLoading } = useTodaySleepStat();
+  const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
 
   const todayStats = todayStat ? {
     sleepMinutes: todayStat.totalSleepMinutes,
     awakeMinutes: todayStat.awakeMinutes,
   } : null;
 
-  // Mutation for tracking
-  const trackMutation = useMutation({
-    mutationFn: addSleepEntry,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["history"] });
-      success("Sleep tracked successfully!");
-      setModalOpen(false);
-    },
-    onError: (err) => {
-      error("Failed to track sleep", {
-        description: err instanceof Error ? err.message : "Unknown error",
-      });
-    },
-  });
-
-  const handleTrackSleep = (timeAgo: number, cycle: "Day" | "Night") => {
-    if (!sheetUrl) {
-      return;
-    }
-
-    trackMutation.mutate({
-      sheetUrl,
-      timeAgo,
-      cycle,
-    });
-  };
+  // Use the reusable sleep mutation hook
+  const trackMutation = useSleepMutation();
 
   // Check if sheet URL is configured
   if (!sheetUrl) {
@@ -70,6 +42,26 @@ function Home() {
   }
 
   const isSleeping = sleepState?.isActive || false;
+
+  const handleTrackSleep = (timeAgo: number, cycle: "Day" | "Night") => {
+    if (!sheetUrl) {
+      return;
+    }
+
+    trackMutation.mutate(
+      {
+        sheetUrl,
+        timeAgo,
+        cycle,
+        what: isSleeping ? "Awake" : "Sleep",
+      },
+      {
+        onSuccess: () => {
+          setModalOpen(false);
+        },
+      }
+    );
+  };
   const displayName = babyName || "Baby";
 
   if (isLoading) {
@@ -115,7 +107,10 @@ function Home() {
               <div className="text-5xl">
                 <Moon className="w-16 h-16 opacity-30" />
               </div>
-              <div className="text-xl font-semibold">No sleep data yet</div>
+              {allStats?.length == 0 ?
+                <div className="text-xl font-semibold">No sleep data yet</div>
+                : <div className="text-xl font-semibold">Today no sleep data yet</div>}
+
               <div className="text-sm opacity-70">Start tracking below</div>
             </>
           )}

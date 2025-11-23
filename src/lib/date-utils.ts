@@ -99,8 +99,8 @@ export function getYesterdayDate(): string {
  */
 export function calculateDateForCycle(
   cycle: "Day" | "Night",
+  lastDate: Dayjs,
   today: Dayjs,
-  lastDate?: Dayjs,
 ): Dayjs {
 
   // If it's a Day cycle, always use today's date

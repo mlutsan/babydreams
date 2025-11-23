@@ -271,16 +271,16 @@ export async function toggleSleep(params: {
   sheetUrl: string;
   timeAgo: number;
   cycle: "Day" | "Night";
+  what: "Sleep" | "Awake";
 }): Promise<{ success: boolean; action: "started" | "ended"; }> {
-  const { sheetUrl, timeAgo, cycle } = params;
+  const { sheetUrl, timeAgo, cycle, what } = params;
 
   // Client-side validation
   if (!["Day", "Night"].includes(cycle)) {
     throw new Error("cycle must be Day or Night");
   }
-  if (timeAgo < 0 || timeAgo > 180) {
-    // Allow up to 3 hours
-    throw new Error("timeAgo must be between 0 and 180 minutes");
+  if (!["Sleep", "Awake"].includes(what)) {
+    throw new Error("what must be Sleep or Awake");
   }
 
   const range = `${SLEEP_SHEET}!A:F`;
@@ -328,7 +328,7 @@ export async function toggleSleep(params: {
         lastDate = entry.date;
       }
 
-      if (entry.endTime === null) {
+      if (entry.endTime === null && entry.endTime) {
         activeEntry = entry;
         activeEntryIndex = i + 2; // +1 for header, +1 for 1-based index
         break;
@@ -337,6 +337,11 @@ export async function toggleSleep(params: {
 
     if (activeEntry && activeEntryIndex > 0) {
       // 5. End active sleep - update End Time column
+      // Validate that we're trying to wake up when baby is sleeping
+      if (what !== "Awake") {
+        throw new Error("Baby is already sleeping. Cannot start sleep when already asleep.");
+      }
+
       const endTime = getTimeAgo(timeAgo);
 
       await updateSheetValues({
@@ -350,6 +355,11 @@ export async function toggleSleep(params: {
       return { success: true, action: "ended" };
     } else {
       // 6. Start new sleep - create entry with empty End Time
+      // Validate that we're trying to sleep when baby is awake
+      if (what !== "Sleep") {
+        throw new Error("Baby is already awake. Cannot wake up when not sleeping.");
+      }
+
       const newDate = calculateDateForCycle(cycle, lastDate || today, today);
       const startTime = getTimeAgo(timeAgo);
       const addedDate = getTimestamp();

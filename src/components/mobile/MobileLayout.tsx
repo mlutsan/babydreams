@@ -1,12 +1,13 @@
 import { ReactNode } from "react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
-import { App, KonstaProvider, Navbar, NavbarBackLink, Page, Tabbar, TabbarLink, ToolbarPane } from "konsta/react";
+import { App, KonstaProvider, Navbar, NavbarBackLink, Page, Tabbar, TabbarLink, ToolbarPane, Toast, Button } from "konsta/react";
 import { Milk, Moon, Settings } from "lucide-react";
 import { Route as IndexRoute } from "~/routes/index";
 import { Route as SettingsRoute } from "~/routes/settings";
 import { Route as HistoryRoute } from "~/routes/history";
 import { Route as EatRoute } from "~/routes/eat";
 import { PullToRefresh } from "~/components/PullToRefresh";
+import { useToast } from "~/hooks/useToast";
 
 interface MobileLayoutProps {
   children: ReactNode;
@@ -15,6 +16,7 @@ interface MobileLayoutProps {
 export function MobileLayout({ children }: MobileLayoutProps) {
   const router = useRouterState();
   const navigate = useNavigate();
+  const { toast: toastState, isOpen: toastOpen, close: closeToast } = useToast();
 
   // Determine navbar configuration based on current route
   const isHistoryPage = router.location.pathname === HistoryRoute.to;
@@ -89,6 +91,30 @@ export function MobileLayout({ children }: MobileLayoutProps) {
 
           </Tabbar>
         </Page>
+
+        {/* Global Toast for all routes */}
+        <Toast
+          position="center"
+          opened={toastOpen}
+          button={
+            <Button
+              rounded
+              clear
+              small
+              inline
+              onClick={closeToast}
+            >
+              Close
+            </Button>
+          }
+        >
+          <div className="shrink">
+            <div className="font-semibold">{toastState?.message}</div>
+            {toastState?.description && (
+              <div className="text-sm opacity-75 mt-1">{toastState.description}</div>
+            )}
+          </div>
+        </Toast>
       </App>
     </KonstaProvider>
   );

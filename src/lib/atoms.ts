@@ -3,6 +3,7 @@
  * Using atomWithStorage for persistent state across sessions
  */
 
+import { atom } from "jotai";
 import { atomWithStorage } from "jotai/utils";
 
 /**
@@ -68,3 +69,18 @@ export function getValidAccessToken(tokenData: TokenData | null): string | null 
   }
   return tokenData.accessToken;
 }
+
+/**
+ * Toast message atom - global state for toast notifications
+ * Not persisted, only in-memory state
+ */
+export interface ToastMessage {
+  id: string;
+  message: string;
+  description?: string;
+  type: "success" | "error";
+  duration?: number;
+}
+
+export const toastAtom = atom<ToastMessage | null>(null);
+export const toastOpenAtom = atom<boolean>(false);

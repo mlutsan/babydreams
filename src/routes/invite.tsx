@@ -2,7 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { useAtom } from "jotai";
 import { sheetUrlAtom } from "~/lib/atoms";
-import { Page, Navbar, Block, BlockTitle, Button, Toast } from "konsta/react";
+import { Page, Navbar, Block, BlockTitle, Button } from "konsta/react";
 import { useToast } from "~/hooks/useToast";
 
 export const Route = createFileRoute("/invite")({
@@ -17,9 +17,9 @@ export const Route = createFileRoute("/invite")({
 function InvitePage() {
   const navigate = useNavigate();
   const { sheet } = Route.useSearch();
-  const { toast: toastState, isOpen: toastOpen, success, error, close: closeToast } = useToast();
+  const { success, error } = useToast();
 
-  const [sheetUrl, setSheetUrl] = useAtom(sheetUrlAtom);
+  const [, setSheetUrl] = useAtom(sheetUrlAtom);
 
   useEffect(() => {
     if (!sheet) {
@@ -56,29 +56,6 @@ function InvitePage() {
           Go to Settings
         </Button>
       </Block>
-
-      <Toast
-        position="center"
-        opened={toastOpen}
-        button={
-          <Button
-            rounded
-            clear
-            small
-            inline
-            onClick={closeToast}
-          >
-            Close
-          </Button>
-        }
-      >
-        <div className="shrink">
-          <div className="font-semibold">{toastState?.message}</div>
-          {toastState?.description && (
-            <div className="text-sm opacity-75 mt-1">{toastState.description}</div>
-          )}
-        </div>
-      </Toast>
     </Page>
   );
 }
