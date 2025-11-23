@@ -194,3 +194,48 @@ export function formatTimeAgoLabel(minutesAgo: number): string {
   }
   return `${minutesAgo} minutes ago`;
 }
+
+/**
+ * Add minutes to a HH:mm time string
+ * Handles wrapping around midnight
+ */
+export function addMinutesToTime(time: string, minutes: number): string {
+  const [hours, mins] = time.split(":").map(Number);
+  const date = dayjs().hour(hours).minute(mins).add(minutes, "minute");
+  return date.format("HH:mm");
+}
+
+/**
+ * Subtract minutes from a HH:mm time string
+ * Handles wrapping around midnight
+ */
+export function subtractMinutesFromTime(time: string, minutes: number): string {
+  return addMinutesToTime(time, -minutes);
+}
+
+/**
+ * Calculate how many minutes ago a given time (HH:mm) was from now
+ * Returns positive number for past times, negative for future times
+ * Handles midnight crossover (if time is in past but after midnight)
+ */
+export function getTimeAgoFromManualInput(time: string): number {
+  if (!time) {
+    return 0;
+  }
+
+  const now = dayjs();
+  const currentMinutes = now.hour() * 60 + now.minute();
+  const inputMinutes = timeToMinutes(time);
+
+  let diff = currentMinutes - inputMinutes;
+
+  // If negative (time is in future), check if it's really future or crossed midnight
+  // If very negative (> 12 hours), assume it's from yesterday (crossed midnight)
+  if (diff < 0 && diff <= -12 * 60) {
+    // Time is in the far past (crossed midnight yesterday)
+    diff += 24 * 60;
+  }
+
+  // Return diff as-is: positive for past, negative for future
+  return diff;
+}

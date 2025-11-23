@@ -84,3 +84,45 @@ export interface ToastMessage {
 
 export const toastAtom = atom<ToastMessage | null>(null);
 export const toastOpenAtom = atom<boolean>(false);
+
+/**
+ * Cycle settings atom - defines when day/night cycles start
+ * Stored as HH:mm strings for flexibility
+ */
+export interface CycleSettings {
+  dayStart: string; // HH:mm format, e.g., "08:00"
+  dayEnd: string;   // HH:mm format, e.g., "20:00"
+}
+
+export const cycleSettingsAtom = atomWithStorage<CycleSettings>(
+  "cycle_settings",
+  { dayStart: "08:00", dayEnd: "20:00" }
+);
+
+/**
+ * Helper function to determine if a given time is Day or Night cycle
+ * @param time - Time in HH:mm format
+ * @param settings - Cycle settings with dayStart and dayEnd
+ * @returns "Day" if time is between dayStart and dayEnd, otherwise "Night"
+ */
+export function calculateCycleFromTime(
+  time: string,
+  settings: CycleSettings
+): "Day" | "Night" {
+  // Convert HH:mm to minutes since midnight for easy comparison
+  const timeToMinutes = (t: string): number => {
+    const [hours, minutes] = t.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const timeMinutes = timeToMinutes(time);
+  const dayStartMinutes = timeToMinutes(settings.dayStart);
+  const dayEndMinutes = timeToMinutes(settings.dayEnd);
+
+  // Check if time is within day cycle
+  if (timeMinutes >= dayStartMinutes && timeMinutes < dayEndMinutes) {
+    return "Day";
+  }
+
+  return "Night";
+}

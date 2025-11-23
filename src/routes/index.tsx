@@ -190,7 +190,6 @@ function Home() {
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
         isSleeping={isSleeping}
-        currentCycle={sleepState?.cycle || "Day"}
         onConfirm={handleTrackSleep}
       />
     </>
