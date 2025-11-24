@@ -1,44 +1,48 @@
 /**
- * Sleep Timeline Component
- * Displays a horizontal timeline showing sleep/awake periods throughout the day
- * Uses visx for visualization primitives
+ * Sleep Timeline Component - Week View
+ * Displays a vertical timeline showing sleep periods across multiple days
+ * Each column represents one logical day (from wake-up to wake-up)
+ * Y-axis is continuous from earliest to latest time across all days
  */
 
 import { useMemo, useRef, useEffect } from "react";
 import dayjs from "dayjs";
-import { scaleTime, scaleBand } from "@visx/scale";
+import { scaleLinear, scaleBand } from "@visx/scale";
 import { Bar } from "@visx/shape";
 import { Group } from "@visx/group";
-import { AxisBottom } from "@visx/axis";
+import { AxisLeft } from "@visx/axis";
+import { Line } from "@visx/shape";
+import { Text } from "@visx/text";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
-import type { SleepEntry } from "~/types/sleep";
+import type { DailyStat } from "~/types/sleep";
 import { formatDuration } from "~/lib/date-utils";
 
-interface TimelineSegment {
+interface SleepBar {
   id: string;
-  startTime: Date;
-  endTime: Date;
-  type: "sleep" | "awake";
+  dayIndex: number;
+  logicalDate: string;
+  startMinutes: number; // Minutes from dayStart reference point
+  endMinutes: number;
   cycle: "Day" | "Night";
   durationMinutes: number;
   isActive: boolean;
+  startTime: string; // For tooltip display
+  endTime: string;
 }
 
-interface SleepTimelineProps {
-  entries: SleepEntry[];
+interface ResponsiveSleepTimelineProps {
+  allDayStats: DailyStat[];
   height?: number;
-  startDatetime: dayjs.Dayjs; // When the day started (baby woke up)
 }
 
-const PIXELS_PER_HOUR = 80; // Width allocated per hour on timeline
+const DAY_COLUMN_WIDTH = 60; // Width per day column
 
-export function SleepTimeline({
-  entries,
-  height = 80,
-  startDatetime,
-}: SleepTimelineProps) {
-  const margin = { top: 10, right: 10, bottom: 30, left: 10 };
+export function ResponsiveSleepTimeline({
+  allDayStats,
+  height = 600,
+}: ResponsiveSleepTimelineProps) {
+  const margin = { top: 40, right: 10, bottom: 10, left: 50 };
   const innerHeight = height - margin.top - margin.bottom;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
@@ -51,7 +55,7 @@ export function SleepTimeline({
     tooltipOpen,
     showTooltip,
     hideTooltip,
-  } = useTooltip<TimelineSegment>();
+  } = useTooltip<SleepBar>();
 
   const { containerRef, TooltipInPortal } = useTooltipInPortal({
     scroll: true,
@@ -59,190 +63,139 @@ export function SleepTimeline({
     zIndex: 1000
   });
 
-  // Transform entries into timeline segments (sleep + awake)
-  const segments = useMemo(() => {
+  // Transform day stats into sleep bars with time-of-day positioning
+  const { sleepBars, minTimeOfDay, maxTimeOfDay, referenceDate } = useMemo(() => {
     const now = dayjs();
-    const result: TimelineSegment[] = [];
-    const dayStart = startDatetime; // When the day started (from component prop)
+    const bars: SleepBar[] = [];
+    let minTimeMinutes = Infinity;
+    let maxTimeMinutes = -Infinity;
 
-    entries.forEach((entry, index) => {
-      const sleepStart = entry.realDatetime;
 
-      let sleepEnd: dayjs.Dayjs;
-      if (entry.endTime === null) {
-        // Active sleep - end time is now
-        sleepEnd = now;
-      } else {
-        // Completed sleep - calculate end datetime using same base as realDatetime
-        sleepEnd = entry.realDatetime.startOf("day").add(entry.endTime);
+    allDayStats.forEach((dayStat) => {
+      const dayStartTimeOfDay = dayStat.startDatetime.hour() * 60 + dayStat.startDatetime.minute();
+      const dayEndTimeOfDay =
+        dayStat.endDatetime.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60
+        + dayStat.endDatetime.hour() * 60 + dayStat.endDatetime.minute();
+      minTimeMinutes = Math.min(minTimeMinutes, dayStartTimeOfDay);
+      maxTimeMinutes = Math.max(dayEndTimeOfDay, maxTimeMinutes);
+    });
 
-        // Adjust for midnight crossover (when end time < start time)
-        const startMinutes = Math.floor(entry.startTime.asMinutes());
-        const endMinutes = Math.floor(entry.endTime.asMinutes());
-        if (endMinutes < startMinutes) {
-          // Sleep crossed midnight - end time is next day
-          sleepEnd = sleepEnd.add(1, "day");
-        }
-      }
+    allDayStats.forEach((dayStat, dayIndex) => {
+      dayStat.entries.forEach((entry, entryIndex) => {
+        const sleepStart = entry.realDatetime;
 
-      const durationMinutes = sleepEnd.diff(sleepStart, "minutes");
-
-      // Add awake segment before this sleep
-      if (index === 0) {
-        // Check if there's awake time from day start to first sleep
-        const awakeDuration = sleepStart.diff(dayStart, "minutes");
-
-        if (awakeDuration > 0) {
-          result.push({
-            id: "awake-start",
-            startTime: dayStart.toDate(),
-            endTime: sleepStart.toDate(),
-            type: "awake",
-            cycle: entry.cycle,
-            durationMinutes: awakeDuration,
-            isActive: false,
-          });
-        }
-      } else {
-        // Add awake segment between previous sleep and this one
-        const prevSegment = result[result.length - 1];
-
-        if (prevSegment.type === "sleep") {
-          const awakeStart = dayjs(prevSegment.endTime);
-          const awakeDuration = sleepStart.diff(awakeStart, "minutes");
-
-          let cycle = prevSegment.cycle;
-
-          if (prevSegment.cycle == "Night" && entry.cycle == "Day") {
-            cycle = "Day";
-          }
-
-          if (awakeDuration > 0) {
-            result.push({
-              id: `awake-${index}`,
-              startTime: awakeStart.toDate(),
-              endTime: sleepStart.toDate(),
-              type: "awake",
-              cycle: cycle,
-              durationMinutes: awakeDuration,
-              isActive: false,
-            });
+        let sleepEnd: dayjs.Dayjs;
+        if (entry.endTime === null) {
+          sleepEnd = now;
+        } else {
+          sleepEnd = entry.realDatetime.startOf("day").add(entry.endTime);
+          const startMinutes = Math.floor(entry.startTime.asMinutes());
+          const endMinutes = Math.floor(entry.endTime.asMinutes());
+          if (endMinutes < startMinutes) {
+            sleepEnd = sleepEnd.add(1, "day");
           }
         }
-      }
 
-      // Add sleep segment
-      result.push({
-        id: `sleep-${index}`,
-        startTime: sleepStart.toDate(),
-        endTime: sleepEnd.toDate(),
-        type: "sleep",
-        cycle: entry.cycle,
-        durationMinutes,
-        isActive: entry.endTime === null,
+        const durationMinutes = sleepEnd.diff(sleepStart, "minutes");
+
+        const hoursStart = sleepStart.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;
+        const hoursEnd = sleepEnd.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;
+
+        const startTimeOfDay = hoursStart + sleepStart.hour() * 60 + sleepStart.minute();
+        const endTimeOfDay = hoursEnd + sleepEnd.hour() * 60 + sleepEnd.minute();
+
+        bars.push({
+          id: `${dayStat.logicalDate}-${entryIndex}`,
+          dayIndex,
+          logicalDate: dayStat.logicalDate,
+          startMinutes: startTimeOfDay,
+          endMinutes: endTimeOfDay,
+          cycle: entry.cycle,
+          durationMinutes,
+          isActive: entry.endTime === null,
+          startTime: sleepStart.format("HH:mm"),
+          endTime: entry.endTime === null ? "Now" : sleepEnd.format("HH:mm"),
+        });
       });
     });
 
-    return result;
-  }, [entries, startDatetime]);
-
-  // Define time range: start to max(start + 12h, last entry end + 1h)
-  const { timelineStart, timelineEnd, durationHours } = useMemo(() => {
-    const start = startDatetime;
-    const min12h = start.add(12, "hours");
-
-    if (segments.length === 0) {
-      // No segments - show 12 hours from start
-      return {
-        timelineStart: start.toDate(),
-        timelineEnd: min12h.toDate(),
-        durationHours: 12,
-      };
-    }
-
-    const lastEnd = segments[segments.length - 1].endTime;
-    const lastEndDayjs = dayjs(lastEnd);
-    const lastEndPlusOne = lastEndDayjs.add(1, "hour");
-
-    // End is whichever is later: start + 12h OR last entry end + 1h
-    const end = lastEndPlusOne.isAfter(min12h) ? lastEndPlusOne : min12h;
-    const hours = end.diff(start, "hours", true); // true for fractional hours
+    // Use a reference date (any date) to format time labels
+    const refDate = dayjs().startOf("day");
 
     return {
-      timelineStart: start.toDate(),
-      timelineEnd: end.toDate(),
-      durationHours: hours,
+      sleepBars: bars,
+      minTimeOfDay: minTimeMinutes !== Infinity ? minTimeMinutes : 0,
+      maxTimeOfDay: maxTimeMinutes !== -Infinity ? maxTimeMinutes : 1440,
+      referenceDate: refDate,
     };
-  }, [segments, startDatetime]);
+  }, [allDayStats]);
 
-  // Calculate SVG width based on duration (grows/shrinks with actual hours)
-  const svgWidth = Math.ceil(durationHours * PIXELS_PER_HOUR);
-  const innerWidth = svgWidth - margin.left - margin.right;
+  // Calculate SVG dimensions
+  const totalDays = allDayStats.length;
+  const svgWidth = totalDays * DAY_COLUMN_WIDTH + margin.left + margin.right;
+  const innerWidth = totalDays * DAY_COLUMN_WIDTH;
 
-  // Time scale (x-axis)
-  const timeScale = scaleTime({
-    domain: [timelineStart, timelineEnd],
-    range: [0, innerWidth],
+  // Y scale - linear scale for time-of-day in minutes (0-1440)
+  const yScale = scaleLinear({
+    domain: [minTimeOfDay, maxTimeOfDay],
+    range: [0, innerHeight],
   });
 
-  // Y scale - single row for all sleep periods
-  const yScale = scaleBand({
-    domain: ["sleep"],
-    range: [0, innerHeight],
+  // Day scale for X-axis (horizontal columns)
+  const dayScale = scaleBand({
+    domain: allDayStats.map((_, i) => i.toString()),
+    range: [0, innerWidth],
     padding: 0.1,
   });
 
-  const barHeight = yScale.bandwidth();
+  const columnWidth = dayScale.bandwidth();
 
   // Color mapping
-  const getColor = (segment: TimelineSegment) => {
-    if (segment.type === "awake") {
-      // Awake periods - lighter/grayed colors
-      return segment.cycle === "Day"
-        ? "#e8ff96"
-        : "#cbd5e1"; // light gray for night awake
-    } else {
-      // Sleep periods
-      return segment.cycle === "Day"
-        ? "#93c5fd" // light blue for day sleep
-        : "#003ea1"; // darker blue for night sleep
-    }
+  const getColor = (bar: SleepBar) => {
+    return bar.cycle === "Day"
+      ? "#93c5fd" // light blue for day sleep
+      : "#003ea1"; // darker blue for night sleep
   };
 
-  if (segments.length === 0) {
-    return (
-      <div
-        style={{ height }}
-        className="flex items-center justify-center text-sm opacity-50"
-      >
-        No sleep data for this period
-      </div>
-    );
+  // Current time indicator position (if today is visible)
+  const todayIndex = allDayStats.findIndex((stat) => {
+    return dayjs(stat.logicalDate).isSame(dayjs(), "day");
+  });
+
+  const showCurrentTimeIndicator = todayIndex !== -1;
+  let currentTimeY = 0;
+
+  if (showCurrentTimeIndicator) {
+    const now = dayjs();
+    const currentTimeOfDay = now.hour() * 60 + now.minute();
+    currentTimeY = yScale(currentTimeOfDay);
   }
 
   // Handle tooltip show/hide
-  const handleMouseMove = (event: React.MouseEvent | React.TouchEvent, segment: TimelineSegment) => {
+  const handleMouseMove = (
+    event: React.MouseEvent | React.TouchEvent,
+    bar: SleepBar
+  ) => {
     const point = localPoint(event) || { x: 0, y: 0 };
-    // Offset tooltip above the touch point (60px above for better visibility)
     const tooltipOffset = 60;
     showTooltip({
-      tooltipData: segment,
+      tooltipData: bar,
       tooltipLeft: point.x,
       tooltipTop: point.y - tooltipOffset,
     });
   };
 
-  // Auto-scroll to latest entry on initial mount only
+  // Auto-scroll to today on initial mount
   useEffect(() => {
-    if (scrollContainerRef.current && segments.length > 0 && !hasAutoScrolled.current) {
-      const lastSegment = segments[segments.length - 1];
-      const lastEntryX = timeScale(lastSegment.endTime);
-
-      // Calculate scroll position to center the last entry
+    if (scrollContainerRef.current && todayIndex !== -1 && !hasAutoScrolled.current) {
+      const todayX = (todayIndex * DAY_COLUMN_WIDTH) + margin.left;
       const containerWidth = scrollContainerRef.current.offsetWidth;
-      const scrollLeft = Math.max(0, lastEntryX + margin.left - containerWidth / 2);
 
-      // Use setTimeout to ensure DOM is fully rendered
+      const scrollLeft = Math.max(
+        0,
+        todayX - containerWidth / 2 + DAY_COLUMN_WIDTH / 2
+      );
+
       setTimeout(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTo({
@@ -253,7 +206,18 @@ export function SleepTimeline({
         }
       }, 100);
     }
-  }, [segments, timeScale, margin.left]);
+  }, [todayIndex, margin.left]);
+
+  if (allDayStats.length === 0) {
+    return (
+      <div
+        style={{ height }}
+        className="flex items-center justify-center text-sm opacity-50"
+      >
+        No sleep data available
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative", width: "100%" }}>
@@ -264,54 +228,125 @@ export function SleepTimeline({
           width: "100%",
           overflowX: "auto",
           overflowY: "hidden",
-          WebkitOverflowScrolling: "touch", // Smooth scrolling on iOS
+          WebkitOverflowScrolling: "touch",
         }}
         className="scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
       >
         <svg width={svgWidth} height={height} ref={containerRef}>
           <Group left={margin.left} top={margin.top}>
-            {/* Sleep bars */}
-            {segments.map((segment) => {
-              const barX = timeScale(segment.startTime);
-              const barWidth = Math.max(
-                2,
-                timeScale(segment.endTime) - barX
+            {/* Date headers */}
+            {allDayStats.map((dayStat, dayIndex) => {
+              const x = dayScale(dayIndex.toString()) || 0;
+              const date = dayjs(dayStat.logicalDate);
+              const isToday = todayIndex === dayIndex;
+
+              return (
+                <Group key={`header-${dayIndex}`} left={x + columnWidth / 2}>
+                  {/* Month label */}
+                  <Text
+                    y={-30}
+                    fontSize={10}
+                    fill="#94a3b8"
+                    textAnchor="middle"
+                  >
+                    {date.format("MMM")}
+                  </Text>
+                  {/* Date number */}
+                  <Text
+                    y={-15}
+                    fontSize={14}
+                    fontWeight={isToday ? "bold" : "normal"}
+                    fill={isToday ? "#0ea5e9" : "#64748b"}
+                    textAnchor="middle"
+                  >
+                    {date.format("D")}
+                  </Text>
+                  {/* Day of week */}
+                  <Text
+                    y={-3}
+                    fontSize={10}
+                    fill="#94a3b8"
+                    textAnchor="middle"
+                  >
+                    {date.format("ddd")}
+                  </Text>
+                </Group>
               );
-              const barY = yScale("sleep") || 0;
+            })}
+
+            {/* Y-axis (time axis) */}
+            <AxisLeft
+              scale={yScale}
+              numTicks={12}
+              tickFormat={(d) => {
+                const timeOfDayMinutes = Number(d);
+                // Convert time-of-day minutes to HH:mm
+                const actualTime = referenceDate.add(timeOfDayMinutes, "minutes");
+                return actualTime.format("HH:mm");
+              }}
+              stroke="#cbd5e1"
+              tickStroke="#cbd5e1"
+              tickLabelProps={() => ({
+                fill: "#64748b",
+                fontSize: 10,
+                textAnchor: "end",
+                dx: -5,
+              })}
+            />
+
+            {/* Grid lines */}
+            {yScale.ticks(12).map((tick) => {
+              const y = yScale(tick);
+              return (
+                <Line
+                  key={`grid-${tick}`}
+                  from={{ x: 0, y }}
+                  to={{ x: innerWidth, y }}
+                  stroke="#e2e8f0"
+                  strokeWidth={1}
+                  strokeDasharray="2,2"
+                />
+              );
+            })}
+
+            {/* Sleep bars */}
+            {sleepBars.map((bar) => {
+              const x = dayScale(bar.dayIndex.toString()) || 0;
+              const barY = yScale(bar.startMinutes);
+              const barHeight = Math.max(
+                2,
+                yScale(bar.endMinutes) - barY
+              );
 
               return (
                 <Bar
-                  key={segment.id}
-                  x={barX}
+                  key={bar.id}
+                  x={x}
                   y={barY}
-                  width={barWidth}
+                  width={columnWidth}
                   height={barHeight}
-                  fill={getColor(segment)}
-                  stroke={segment.isActive ? "#9fb1ab" : "transparent"}
-                  strokeWidth={segment.isActive ? 2 : 0}
-                  onMouseMove={(event) => handleMouseMove(event, segment)}
+                  fill={getColor(bar)}
+                  stroke={bar.isActive ? "#9fb1ab" : "transparent"}
+                  strokeWidth={bar.isActive ? 2 : 0}
+                  rx={2}
+                  onMouseMove={(event) => handleMouseMove(event, bar)}
                   onMouseLeave={hideTooltip}
-                  onTouchStart={(event) => handleMouseMove(event, segment)}
+                  onTouchStart={(event) => handleMouseMove(event, bar)}
                   onTouchEnd={hideTooltip}
                   style={{ cursor: "pointer" }}
                 />
               );
             })}
 
-            {/* Time axis */}
-            <AxisBottom
-              top={innerHeight}
-              scale={timeScale}
-              numTicks={durationHours}
-              tickFormat={(d) => dayjs(d as Date).format("HH:mm")}
-              stroke="#cbd5e1"
-              tickStroke="#cbd5e1"
-              tickLabelProps={() => ({
-                fill: "#64748b",
-                fontSize: 10,
-                textAnchor: "middle",
-              })}
-            />
+            {/* Current time indicator (red line) */}
+            {showCurrentTimeIndicator && currentTimeY >= 0 && currentTimeY <= innerHeight && (
+              <Line
+                from={{ x: 0, y: currentTimeY }}
+                to={{ x: innerWidth, y: currentTimeY }}
+                stroke="#ef4444"
+                strokeWidth={2}
+              />
+            )}
           </Group>
         </svg>
       </div>
@@ -326,14 +361,14 @@ export function SleepTimeline({
         >
           <div className="text-sm space-y-1">
             <div className="font-semibold text-gray-900 dark:text-gray-100">
-              {tooltipData.type === "awake" ? "Awake" : tooltipData.cycle + " Sleep"}
+              {tooltipData.cycle} Sleep
               {tooltipData.isActive && " (Active)"}
             </div>
+            <div className="text-gray-600 dark:text-gray-400 text-xs">
+              {dayjs(tooltipData.logicalDate).format("MMM D, YYYY")}
+            </div>
             <div className="text-gray-600 dark:text-gray-400">
-              {dayjs(tooltipData.startTime).format("h:mm A")} → {" "}
-              {tooltipData.isActive
-                ? "Now"
-                : dayjs(tooltipData.endTime).format("h:mm A")}
+              {tooltipData.startTime} → {tooltipData.endTime}
             </div>
             <div className="text-gray-700 dark:text-gray-300">
               Duration: {formatDuration(tooltipData.durationMinutes)}
@@ -342,29 +377,5 @@ export function SleepTimeline({
         </TooltipInPortal>
       )}
     </div>
-  );
-}
-
-/**
- * Wrapper for SleepTimeline
- * No longer uses ParentSize since timeline has fixed width with horizontal scroll
- */
-interface ResponsiveSleepTimelineProps {
-  entries: SleepEntry[];
-  height?: number;
-  startDatetime: dayjs.Dayjs;
-}
-
-export function ResponsiveSleepTimeline({
-  entries,
-  height = 80,
-  startDatetime,
-}: ResponsiveSleepTimelineProps) {
-  return (
-    <SleepTimeline
-      entries={entries}
-      startDatetime={startDatetime}
-      height={height}
-    />
   );
 }

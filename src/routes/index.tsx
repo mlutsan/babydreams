@@ -1,7 +1,7 @@
 "use client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { Moon, Sun, History as HistoryIcon } from "lucide-react";
@@ -27,6 +27,27 @@ function Home() {
     sleepMinutes: todayStat.totalSleepMinutes,
     awakeMinutes: todayStat.awakeMinutes,
   } : null;
+
+  // Calculate historical averages for comparison (last 7 days excluding today)
+  const historicalAvg = useMemo(() => {
+    if (!allStats || allStats.length < 2) {
+      return null;
+    }
+
+    const recentStats = allStats.slice(-8, -1); // Last 7 days before today
+    if (recentStats.length === 0) {
+      return null;
+    }
+
+    const avgSleep = Math.round(
+      recentStats.reduce((sum, stat) => sum + stat.totalSleepMinutes, 0) / recentStats.length
+    );
+    const avgSessions = Math.round(
+      recentStats.reduce((sum, stat) => sum + stat.sessionCount, 0) / recentStats.length
+    );
+
+    return { avgSleep, avgSessions };
+  }, [allStats]);
 
   // Use the reusable sleep mutation hook
   const trackMutation = useSleepMutation();
@@ -140,29 +161,94 @@ function Home() {
       {/* Today's Stats */}
       <BlockTitle>Today</BlockTitle>
       <Block strong inset>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-4 mb-4">
           <div className="text-center py-4">
-            <div className="text-sm opacity-70 mb-1">Awake</div>
-            <div className="text-2xl font-semibold">
-              {formatDurationHHMM(todayStats?.awakeMinutes || 0)}
-            </div>
-          </div>
-          <div className="text-center py-4">
-            <div className="text-sm opacity-70 mb-1">Sleep</div>
+            <div className="text-sm opacity-70 mb-1">Total Sleep</div>
             <div className="text-2xl font-semibold">
               {formatDurationHHMM(todayStats?.sleepMinutes || 0)}
             </div>
           </div>
+          <div className="text-center py-4">
+            <div className="text-sm opacity-70 mb-1">Awake Time</div>
+            <div className="text-2xl font-semibold">
+              {formatDurationHHMM(todayStats?.awakeMinutes || 0)}
+            </div>
+          </div>
         </div>
 
-        {todayStat && todayStat.entries.length > 0 && (
+        {todayStat && (
           <>
-            <ResponsiveSleepTimeline
-              entries={todayStat.entries}
-              startDatetime={todayStat.startDatetime}
-              height={80}
-            />
+            <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
+                <div className="opacity-70 text-xs mb-1">Day Sleep</div>
+                <div className="font-semibold">
+                  {formatDuration(todayStat.daySleepMinutes)}
+                </div>
+              </div>
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg px-3 py-2">
+                <div className="opacity-70 text-xs mb-1">Night Sleep</div>
+                <div className="font-semibold">
+                  {formatDuration(todayStat.nightSleepMinutes)}
+                </div>
+              </div>
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-lg px-3 py-2">
+                <div className="opacity-70 text-xs mb-1">Sleep Sessions</div>
+                <div className="font-semibold">
+                  {todayStat.sessionCount}
+                  {historicalAvg && (
+                    <span className={`ml-1 text-xs ${todayStat.sessionCount > historicalAvg.avgSessions
+                        ? "text-orange-600"
+                        : todayStat.sessionCount < historicalAvg.avgSessions
+                          ? "text-green-600"
+                          : "text-gray-500"
+                      }`}>
+                      {todayStat.sessionCount > historicalAvg.avgSessions
+                        ? "↑"
+                        : todayStat.sessionCount < historicalAvg.avgSessions
+                          ? "↓"
+                          : "→"}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg px-3 py-2">
+                <div className="opacity-70 text-xs mb-1">Longest Nap</div>
+                <div className="font-semibold">
+                  {formatDuration(
+                    Math.max(
+                      ...todayStat.entries.map(e =>
+                        e.endTime
+                          ? Math.floor(e.endTime.asMinutes() - e.startTime.asMinutes())
+                          : 0
+                      ),
+                      0
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {historicalAvg && (
+              <div className="text-xs opacity-70 text-center pt-2 border-t border-gray-200 dark:border-gray-700">
+                7-day avg: {formatDuration(historicalAvg.avgSleep)} sleep, {historicalAvg.avgSessions} sessions
+                {todayStat.totalSleepMinutes > historicalAvg.avgSleep + 30 && (
+                  <span className="ml-2 text-green-600 font-medium">Great day!</span>
+                )}
+                {todayStat.totalSleepMinutes < historicalAvg.avgSleep - 30 && (
+                  <span className="ml-2 text-orange-600 font-medium">Below average</span>
+                )}
+              </div>
+            )}
           </>
+        )}
+      </Block>
+
+      <Block strong inset>
+        {allStats && allStats.length > 0 && (
+          <ResponsiveSleepTimeline
+            allDayStats={allStats}
+            height={600}
+          />
         )}
       </Block>
 
