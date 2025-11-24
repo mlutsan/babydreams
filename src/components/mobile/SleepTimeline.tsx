@@ -12,7 +12,7 @@ import { Group } from "@visx/group";
 import { AxisBottom } from "@visx/axis";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
-import type { SleepEntry } from "~/lib/sleep-service";
+import type { SleepEntry } from "~/types/sleep";
 import { formatDuration } from "~/lib/date-utils";
 
 interface TimelineSegment {

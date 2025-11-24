@@ -11,7 +11,7 @@ import {
   SegmentedButton,
 } from "konsta/react";
 import { X, Edit2 } from "lucide-react";
-import { getTimeAgoFromManualInput, addMinutesToTime } from "~/lib/date-utils";
+import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
 import { babyNameAtom, cycleSettingsAtom, calculateCycleFromTime } from "~/lib/atoms";
 import dayjs from "dayjs";
 
@@ -19,7 +19,7 @@ interface SleepModalProps {
   opened: boolean;
   onClose: () => void;
   isSleeping: boolean; // Is baby currently sleeping?
-  onConfirm: (timeAgo: number, cycle: "Day" | "Night") => void;
+  onConfirm: (time: string, cycle: "Day" | "Night") => void;
 }
 
 export function SleepModal({
@@ -52,18 +52,19 @@ export function SleepModal({
     }
   }, [selectedTime, cycleSettings]);
 
-  // Calculate timeAgo from selected time
+  const handleConfirm = () => {
+    if (!selectedTime) {
+      return;
+    }
+    onConfirm(selectedTime, cycle);
+  };
+
+  // Calculate relative time for display only
   const getTimeAgoFromSelectedTime = (): number => {
     if (!selectedTime) {
       return 0;
     }
-
     return getTimeAgoFromManualInput(selectedTime);
-  };
-
-  const handleConfirm = () => {
-    const timeAgo = getTimeAgoFromSelectedTime();
-    onConfirm(timeAgo, cycle);
   };
 
   const handleTimeAdjustment = (minutes: number) => {

@@ -6,9 +6,10 @@
 
 import dayjs, { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
-import { parseRow, type SleepEntry } from "~/lib/sleep-service";
+import { parseRow, calculateSleepDuration } from "~/lib/sleep-utils";
 import { getSheetValues } from "~/server/proxy";
 import { formatDuration } from "~/lib/date-utils";
+import type { SleepEntry, DailyStat as DailyStatType } from "~/types/sleep";
 
 dayjs.extend(duration);
 
@@ -37,41 +38,8 @@ export type DayHistory = {
   nightCycleDurationMinutes: number; // Total duration of night cycle
 };
 
-export type DailyStat = {
-  // Date range of this logical day
-  //logicalDate: Dayjs;
-  startDatetime: Dayjs;
-  endDatetime: Dayjs;
-  // Sleep totals
-  totalSleepMinutes: number;
-  awakeMinutes: number; // 24 hours - total sleep time
-  daySleepMinutes: number; // Sum of cycle="Day" entries
-  nightSleepMinutes: number; // Sum of cycle="Night" entries
-  // Metadata
-  sessionCount: number;
-  hasActiveSleep: boolean; // True if last session is still active
-  entries: SleepEntry[];
-};
-
-/**
- * Calculate sleep duration in minutes
- */
-function calculateSleepDuration(
-  startTime: duration.Duration,
-  endTime: duration.Duration
-): number {
-  const startMinutes = Math.floor(startTime.asMinutes());
-  const endMinutes = Math.floor(endTime.asMinutes());
-
-  let diff = endMinutes - startMinutes;
-
-  // Handle midnight crossover
-  if (diff < 0) {
-    diff += 24 * 60;
-  }
-
-  return diff;
-}
+// Re-export DailyStat from shared types for backward compatibility
+export type DailyStat = DailyStatType;
 
 /**
  * Convert date + time duration to full datetime, adjusting for night cycle
@@ -125,11 +93,13 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
     // Skip header row
     const dataRows = rows.slice(1);
 
-    // Parse all entries
+    // Parse all entries and store their sheet row indices
     const allEntries: SleepEntry[] = [];
     for (let i = 0; i < dataRows.length; i++) {
       const entry = parseRow(dataRows[i]);
       if (entry) {
+        // Store the 1-based row index (i + 2: +1 for header row, +1 for 1-based index)
+        entry.sheetRowIndex = i + 2;
         allEntries.push(entry);
       }
     }
@@ -213,6 +183,7 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
         currentStat = {
           startDatetime: newStartDatetime,
           endDatetime: entryEndDatetime,
+          logicalDate: newStartDatetime.format("YYYY-MM-DD"),
           totalSleepMinutes: durationMinutes,
           awakeMinutes: 0, // Calculated when stat is complete
           daySleepMinutes: entry.cycle === "Day" ? durationMinutes : 0,

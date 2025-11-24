@@ -28,16 +28,6 @@ export function useSleepHistory() {
   });
 }
 
-export type SleepState = {
-  isActive: boolean;
-  startTime: string | null;
-  duration: number;
-  cycle: "Day" | "Night";
-  date: string;
-  awakeStartTime: string | null;
-  awakeDuration: number;
-};
-
 /**
  * Hook for getting today's sleep stat
  * Returns the most recent DailyStat that represents "today"

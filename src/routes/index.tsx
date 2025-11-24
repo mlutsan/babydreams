@@ -43,7 +43,7 @@ function Home() {
 
   const isSleeping = sleepState?.isActive || false;
 
-  const handleTrackSleep = (timeAgo: number, cycle: "Day" | "Night") => {
+  const handleTrackSleep = (time: string, cycle: "Day" | "Night") => {
     if (!sheetUrl) {
       return;
     }
@@ -51,9 +51,10 @@ function Home() {
     trackMutation.mutate(
       {
         sheetUrl,
-        timeAgo,
+        time,
         cycle,
         what: isSleeping ? "Awake" : "Sleep",
+        todayStat: todayStat || null,
       },
       {
         onSuccess: () => {
