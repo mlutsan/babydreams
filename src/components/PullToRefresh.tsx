@@ -14,7 +14,7 @@ interface PullToRefreshProps {
   onRefresh?: () => Promise<void> | void;
   /**
    * Minimum distance (in pixels) to trigger refresh
-   * @default 120
+   * @default 85
    */
   threshold?: number;
 }
@@ -27,7 +27,7 @@ export function PullToRefresh({
   children,
   queryKeys,
   onRefresh,
-  threshold = 120,
+  threshold = 85,
 }: PullToRefreshProps) {
   const { containerRef, pullChange, isRefreshing } = usePullToRefresh({
     threshold,

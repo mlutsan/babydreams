@@ -53,7 +53,10 @@ export function MobileLayout({ children }: MobileLayoutProps) {
           />
           <PullToRefresh queryKeys={queryKeys}>
             {children}
+            <div className="h-[120px]"></div>
+
           </PullToRefresh>
+
 
           <Tabbar labels icons className="left-0 bottom-0 fixed">
             <ToolbarPane>
@@ -90,31 +93,33 @@ export function MobileLayout({ children }: MobileLayoutProps) {
             </ToolbarPane>
 
           </Tabbar>
+
+          {/* Global Toast for all routes */}
+          <Toast
+            position="center"
+            opened={toastOpen}
+            button={
+              <Button
+                rounded
+                clear
+                small
+                inline
+                onClick={closeToast}
+              >
+                Close
+              </Button>
+            }
+          >
+            <div className="shrink">
+              <div className="font-semibold">{toastState?.message}</div>
+              {toastState?.description && (
+                <div className="text-sm opacity-75 mt-1">{toastState.description}</div>
+              )}
+            </div>
+          </Toast>
         </Page>
 
-        {/* Global Toast for all routes */}
-        <Toast
-          position="center"
-          opened={toastOpen}
-          button={
-            <Button
-              rounded
-              clear
-              small
-              inline
-              onClick={closeToast}
-            >
-              Close
-            </Button>
-          }
-        >
-          <div className="shrink">
-            <div className="font-semibold">{toastState?.message}</div>
-            {toastState?.description && (
-              <div className="text-sm opacity-75 mt-1">{toastState.description}</div>
-            )}
-          </div>
-        </Toast>
+
       </App>
     </KonstaProvider>
   );

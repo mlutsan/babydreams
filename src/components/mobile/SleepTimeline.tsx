@@ -5,12 +5,12 @@
  * Y-axis is continuous from earliest to latest time across all days
  */
 
-import { useMemo, useRef, useEffect } from "react";
+import { useMemo, useRef, useEffect, useState } from "react";
 import dayjs from "dayjs";
 import { scaleLinear, scaleBand } from "@visx/scale";
 import { Bar } from "@visx/shape";
 import { Group } from "@visx/group";
-import { AxisLeft } from "@visx/axis";
+import { AxisLeft, AxisRight } from "@visx/axis";
 import { Line } from "@visx/shape";
 import { Text } from "@visx/text";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
@@ -42,10 +42,14 @@ export function ResponsiveSleepTimeline({
   allDayStats,
   height = 600,
 }: ResponsiveSleepTimelineProps) {
-  const margin = { top: 40, right: 10, bottom: 10, left: 50 };
+  const margin = { top: 40, right: 50, bottom: 10, left: 50 };
   const innerHeight = height - margin.top - margin.bottom;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
+  const tooltipTimeout = useRef<number>();
+
+  // Track which bar is currently highlighted
+  const [highlightedBarId, setHighlightedBarId] = useState<string | null>(null);
 
   // Tooltip hooks
   const {
@@ -172,17 +176,40 @@ export function ResponsiveSleepTimeline({
   }
 
   // Handle tooltip show/hide
-  const handleMouseMove = (
+  const handleBarInteraction = (
     event: React.MouseEvent | React.TouchEvent,
-    bar: SleepBar
+    bar: SleepBar,
+    barX: number,
+    barWidth: number
   ) => {
-    const point = localPoint(event) || { x: 0, y: 0 };
-    const tooltipOffset = 60;
+    // Clear any existing timeout
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+    }
+
+    // Highlight the bar
+    setHighlightedBarId(bar.id);
+
+    // Get event coordinates relative to SVG
+    const eventSvgCoords = localPoint(event);
+
+    // Position tooltip at center of bar horizontally, above the touch point
+    const left = barX + barWidth / 2;
+    const top = (eventSvgCoords?.y || 0) - 120;
+
     showTooltip({
       tooltipData: bar,
-      tooltipLeft: point.x,
-      tooltipTop: point.y - tooltipOffset,
+      tooltipTop: top,
+      tooltipLeft: left,
     });
+  };
+
+  const handleBarLeave = () => {
+    // Delay hiding tooltip to prevent flicker
+    tooltipTimeout.current = window.setTimeout(() => {
+      hideTooltip();
+      setHighlightedBarId(null);
+    }, 300);
   };
 
   // Auto-scroll to today on initial mount
@@ -274,13 +301,12 @@ export function ResponsiveSleepTimeline({
               );
             })}
 
-            {/* Y-axis (time axis) */}
+            {/* Y-axis (time axis) - Left */}
             <AxisLeft
               scale={yScale}
               numTicks={12}
               tickFormat={(d) => {
                 const timeOfDayMinutes = Number(d);
-                // Convert time-of-day minutes to HH:mm
                 const actualTime = referenceDate.add(timeOfDayMinutes, "minutes");
                 return actualTime.format("HH:mm");
               }}
@@ -291,6 +317,26 @@ export function ResponsiveSleepTimeline({
                 fontSize: 10,
                 textAnchor: "end",
                 dx: -5,
+              })}
+            />
+
+            {/* Y-axis (time axis) - Right */}
+            <AxisRight
+              left={innerWidth}
+              scale={yScale}
+              numTicks={12}
+              tickFormat={(d) => {
+                const timeOfDayMinutes = Number(d);
+                const actualTime = referenceDate.add(timeOfDayMinutes, "minutes");
+                return actualTime.format("HH:mm");
+              }}
+              stroke="#cbd5e1"
+              tickStroke="#cbd5e1"
+              tickLabelProps={() => ({
+                fill: "#64748b",
+                fontSize: 10,
+                textAnchor: "start",
+                dx: 5,
               })}
             />
 
@@ -318,6 +364,8 @@ export function ResponsiveSleepTimeline({
                 yScale(bar.endMinutes) - barY
               );
 
+              const isHighlighted = highlightedBarId === bar.id;
+
               return (
                 <Bar
                   key={bar.id}
@@ -326,14 +374,13 @@ export function ResponsiveSleepTimeline({
                   width={columnWidth}
                   height={barHeight}
                   fill={getColor(bar)}
-                  stroke={bar.isActive ? "#9fb1ab" : "transparent"}
-                  strokeWidth={bar.isActive ? 2 : 0}
+                  stroke={bar.isActive ? "#9fb1ab" : isHighlighted ? "#f59e0b" : "transparent"}
+                  strokeWidth={bar.isActive || isHighlighted ? 2 : 0}
                   rx={2}
-                  onMouseMove={(event) => handleMouseMove(event, bar)}
-                  onMouseLeave={hideTooltip}
-                  onTouchStart={(event) => handleMouseMove(event, bar)}
-                  onTouchEnd={hideTooltip}
+                  onMouseMove={(event) => handleBarInteraction(event, bar, x, columnWidth)}
+                  onMouseLeave={handleBarLeave}
                   style={{ cursor: "pointer" }}
+                  opacity={isHighlighted ? 0.9 : 1}
                 />
               );
             })}

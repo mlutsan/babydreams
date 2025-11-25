@@ -153,11 +153,6 @@ function Home() {
         {/* </Card> */}
       </Block>
 
-      {/* Action Button */}
-      <Block inset>
-
-      </Block>
-
       {/* Today's Stats */}
       <BlockTitle>Today</BlockTitle>
       <Block strong inset>
@@ -197,10 +192,10 @@ function Home() {
                   {todayStat.sessionCount}
                   {historicalAvg && (
                     <span className={`ml-1 text-xs ${todayStat.sessionCount > historicalAvg.avgSessions
-                        ? "text-orange-600"
-                        : todayStat.sessionCount < historicalAvg.avgSessions
-                          ? "text-green-600"
-                          : "text-gray-500"
+                      ? "text-orange-600"
+                      : todayStat.sessionCount < historicalAvg.avgSessions
+                        ? "text-green-600"
+                        : "text-gray-500"
                       }`}>
                       {todayStat.sessionCount > historicalAvg.avgSessions
                         ? "↑"
@@ -252,9 +247,6 @@ function Home() {
         )}
       </Block>
 
-
-
-
       {/* History Link */}
       <Block inset>
         <Link to="/history">
@@ -269,8 +261,6 @@ function Home() {
           </Button>
         </Link>
       </Block>
-
-
 
       {/* Sleep Modal */}
       <SleepModal
