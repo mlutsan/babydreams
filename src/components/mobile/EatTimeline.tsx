@@ -39,6 +39,7 @@ export function EatTimeline({
   const innerHeight = height - margin.top - margin.bottom;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
+  const tooltipTimeout = useRef<number | undefined>(undefined);
 
   // Tooltip hooks
   const {
@@ -53,7 +54,7 @@ export function EatTimeline({
   const { containerRef, TooltipInPortal } = useTooltipInPortal({
     scroll: true,
     detectBounds: true,
-    zIndex: 1000,
+    zIndex: 1000
   });
 
   // Define time range: start to max(start + 12h, last entry + 1h)
@@ -129,15 +130,35 @@ export function EatTimeline({
   }, [bars, margin.left]);
 
   // Handle tooltip show/hide
-  const handleMouseMove = (event: React.MouseEvent | React.TouchEvent, entry: EatEntry) => {
-    const point = localPoint(event) || { x: 0, y: 0 };
-    // Offset tooltip above the touch point (60px above for better visibility)
-    const tooltipOffset = 60;
+  const handleBarInteraction = (
+    event: React.MouseEvent | React.TouchEvent,
+    entry: EatEntry,
+    barX: number
+  ) => {
+    // Clear any existing timeout
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+    }
+
+    // Get event coordinates relative to SVG
+    const eventSvgCoords = localPoint(event);
+
+    // Position tooltip at center of bar horizontally, above the touch point
+    const left = barX;
+    const top = (eventSvgCoords?.y || 0) - 120;
+
     showTooltip({
       tooltipData: entry,
-      tooltipLeft: point.x,
-      tooltipTop: point.y - tooltipOffset,
+      tooltipTop: top,
+      tooltipLeft: left,
     });
+  };
+
+  const handleBarLeave = () => {
+    // Delay hiding tooltip to prevent flicker
+    tooltipTimeout.current = window.setTimeout(() => {
+      hideTooltip();
+    }, 300);
   };
 
   if (entries.length === 0) {
@@ -166,7 +187,7 @@ export function EatTimeline({
       >
         <svg width={svgWidth} height={height} ref={containerRef}>
           <Group left={margin.left} top={margin.top}>
-            {/* Feeding bars */}
+            {/* Meal bars */}
             {bars.map((bar, index) => {
               const barHeight = innerHeight - volumeScale(bar.volume);
               const barY = volumeScale(bar.volume);
@@ -180,10 +201,8 @@ export function EatTimeline({
                   height={barHeight}
                   fill="#fbbf24"
                   rx={3}
-                  onMouseMove={(event) => handleMouseMove(event, entries[index])}
-                  onMouseLeave={hideTooltip}
-                  onTouchStart={(event) => handleMouseMove(event, entries[index])}
-                  onTouchEnd={hideTooltip}
+                  onMouseMove={(event) => handleBarInteraction(event, entries[index], bar.x)}
+                  onMouseLeave={handleBarLeave}
                   style={{ cursor: "pointer" }}
                 />
               );
@@ -217,7 +236,7 @@ export function EatTimeline({
         >
           <div className="text-sm space-y-1">
             <div className="font-semibold text-gray-900 dark:text-gray-100">
-              Feeding
+              Meal
             </div>
             <div className="text-gray-600 dark:text-gray-400">
               {dayjs(tooltipData.datetime).format("h:mm A")}

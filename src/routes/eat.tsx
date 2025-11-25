@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
-import { Plus } from "lucide-react";
 import { getEatHistory } from "~/lib/eat-service";
 import { getHistory } from "~/lib/history-service";
 import { EatModal } from "~/components/mobile/EatModal";
@@ -88,7 +87,7 @@ function Eat() {
     return dayjs();
   }, [sleepStats]);
 
-  const handleAddFeeding = (volume: number) => {
+  const handleAddMeal = (volume: number) => {
     if (!sheetUrl) {
       return;
     }
@@ -136,8 +135,6 @@ function Eat() {
 
   return (
     <>
-      {/* Daily Stats */}
-      <BlockTitle>Daily Stats</BlockTitle>
       <Block strong inset>
         <div className="grid grid-cols-2 gap-4 py-4">
           {/* Today */}
@@ -183,7 +180,6 @@ function Eat() {
           disabled={addMutation.isPending}
           className="w-full bg-amber-500 active:bg-amber-600 mt-4"
         >
-          <Plus className="w-5 h-5 mr-2" />
           {addMutation.isPending ? "Nom nom nom..." : "Add Meal"}
         </Button>
       </Block>
@@ -198,26 +194,23 @@ function Eat() {
         </>
       )}
 
-      {/* Feeding Overview Chart */}
+      {/* Meal Overview Chart */}
       {allStats && allStats.length > 0 && (
         <>
-          <BlockTitle>Feeding History</BlockTitle>
+          {/* <BlockTitle>Meal History</BlockTitle> */}
           <Block strong inset>
             <EatOverviewChart dailyStats={allStats} height={240} />
           </Block>
         </>
       )}
 
-      {/* Add Feeding Button */}
-      <Block inset>
-
-      </Block>
 
       {/* Eat Modal */}
       <EatModal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        onConfirm={handleAddFeeding}
+        onConfirm={handleAddMeal}
+        isLoading={addMutation.isPending}
       />
     </>
   );

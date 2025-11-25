@@ -8,25 +8,20 @@ import duration from "dayjs/plugin/duration";
 
 
 /**
- * Convert minutes to human-readable duration format "2h 15m" or "45m"
+ * Convert minutes to HH:mm duration format (e.g., "02:15")
  */
 export function formatDuration(minutes: number): string {
   if (minutes < 0) {
-    return "0m";
+    return "00:00";
   }
 
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
 
-  if (hours === 0) {
-    return `${mins}m`;
-  }
+  const hh = hours.toString().padStart(2, "0");
+  const mm = mins.toString().padStart(2, "0");
 
-  if (mins === 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${mins}m`;
+  return `${hh}:${mm}`;
 }
 
 /**

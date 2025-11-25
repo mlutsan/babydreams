@@ -20,6 +20,7 @@ interface SleepModalProps {
   onClose: () => void;
   isSleeping: boolean; // Is baby currently sleeping?
   onConfirm: (time: string, cycle: "Day" | "Night") => void;
+  isLoading?: boolean; // Is data being saved?
 }
 
 export function SleepModal({
@@ -27,6 +28,7 @@ export function SleepModal({
   onClose,
   isSleeping,
   onConfirm,
+  isLoading = false,
 }: SleepModalProps) {
   const babyName = useAtomValue(babyNameAtom);
   const cycleSettings = useAtomValue(cycleSettingsAtom);
@@ -191,8 +193,8 @@ export function SleepModal({
 
           {/* Confirm Button */}
           <div className="mt-8">
-            <Button large rounded onClick={handleConfirm}>
-              Confirm
+            <Button large rounded onClick={handleConfirm} disabled={isLoading}>
+              {isLoading ? "Saving..." : "Confirm"}
             </Button>
           </div>
         </div>

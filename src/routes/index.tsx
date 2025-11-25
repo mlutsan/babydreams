@@ -268,6 +268,7 @@ function Home() {
         onClose={() => setModalOpen(false)}
         isSleeping={isSleeping}
         onConfirm={handleTrackSleep}
+        isLoading={trackMutation.isPending}
       />
     </>
   );

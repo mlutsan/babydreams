@@ -18,9 +18,9 @@ interface EatStatsProps {
 interface WeeklyStats {
   totalVolume: number;
   avgDailyVolume: number;
-  totalFeedings: number;
-  avgFeedingsPerDay: number;
-  avgVolumePerFeeding: number;
+  totalMeals: number;
+  avgMealsPerDay: number;
+  avgVolumePerMeal: number;
   daysWithData: number;
 }
 
@@ -37,22 +37,22 @@ function calculateWeeklyStats(
     return {
       totalVolume: 0,
       avgDailyVolume: 0,
-      totalFeedings: 0,
-      avgFeedingsPerDay: 0,
-      avgVolumePerFeeding: 0,
+      totalMeals: 0,
+      avgMealsPerDay: 0,
+      avgVolumePerMeal: 0,
       daysWithData: 0,
     };
   }
 
   const totalVolume = weekStats.reduce((sum, s) => sum + s.totalVolume, 0);
-  const totalFeedings = weekStats.reduce((sum, s) => sum + s.entryCount, 0);
+  const totalMeals = weekStats.reduce((sum, s) => sum + s.entryCount, 0);
 
   return {
     totalVolume,
     avgDailyVolume: totalVolume / weekStats.length,
-    totalFeedings,
-    avgFeedingsPerDay: totalFeedings / weekStats.length,
-    avgVolumePerFeeding: totalVolume / totalFeedings,
+    totalMeals,
+    avgMealsPerDay: totalMeals / weekStats.length,
+    avgVolumePerMeal: totalVolume / totalMeals,
     daysWithData: weekStats.length,
   };
 }
@@ -75,43 +75,54 @@ export function EatStats({ dailyStats }: EatStatsProps) {
         100;
     }
 
-    // Find most recent feeding
+    // Find most recent meal
     const allEntries = dailyStats.flatMap((d) => d.entries);
     const sortedEntries = allEntries.sort(
       (a, b) => b.datetime.unix() - a.datetime.unix()
     );
-    const lastFeeding = sortedEntries[0];
-    const timeSinceLastFeeding = lastFeeding
-      ? now.diff(lastFeeding.datetime, "hours", true)
+    const lastMeal = sortedEntries[0];
+    const timeSinceLastMeal = lastMeal
+      ? now.diff(lastMeal.datetime, "hours", true)
       : null;
 
     return {
       thisWeek,
       lastWeek,
       volumeChange,
-      timeSinceLastFeeding,
-      lastFeeding,
+      timeSinceLastMeal,
+      lastMeal,
     };
   }, [dailyStats]);
 
-  const { thisWeek, lastWeek, volumeChange, timeSinceLastFeeding } = stats;
+  const { thisWeek, lastWeek, volumeChange, timeSinceLastMeal, lastMeal } = stats;
 
   // Don't show if no data
   if (thisWeek.daysWithData === 0 && lastWeek.daysWithData === 0) {
     return null;
   }
 
-  const formatHoursSince = (hours: number | null) => {
-    if (hours === null) {
-      return "N/A";
+  const formatTimeSince = () => {
+    if (!lastMeal) {
+      return { time: "N/A", duration: "" };
     }
-    if (hours < 1) {
-      return `${Math.round(hours * 60)} min`;
-    }
+    const hours = timeSinceLastMeal || 0;
     if (hours < 24) {
-      return `${hours.toFixed(1)} hrs`;
+      // Show time (HH:mm) for meals within last 24 hours
+      const totalMinutes = Math.round(hours * 60);
+      const durationHours = Math.floor(totalMinutes / 60);
+      const durationMinutes = totalMinutes % 60;
+      const durationStr = `${String(durationHours).padStart(2, '0')}:${String(durationMinutes).padStart(2, '0')} ago`;
+
+      return {
+        time: lastMeal.datetime.format("HH:mm"),
+        duration: durationStr
+      };
     }
-    return `${Math.floor(hours / 24)}d ${Math.round(hours % 24)}h`;
+    // Show days ago for older meals
+    return {
+      time: `${Math.floor(hours / 24)}d ago`,
+      duration: ""
+    };
   };
 
   return (
@@ -169,41 +180,43 @@ export function EatStats({ dailyStats }: EatStatsProps) {
         </div>
       </div>
 
-      {/* Feeding Insights */}
+      {/* Meal Insights */}
       <div className="grid grid-cols-3 gap-2">
-        {/* Average per Feeding */}
+        {/* Average per Meal */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-            Per Feeding
+            Per Meal
           </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {Math.round(thisWeek.avgVolumePerFeeding)}
+            {Math.round(thisWeek.avgVolumePerMeal)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">ml avg</div>
         </div>
 
-        {/* Feedings per Day */}
+        {/* Meals per Day */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
             Per Day
           </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {thisWeek.avgFeedingsPerDay.toFixed(1)}
+            {thisWeek.avgMealsPerDay.toFixed(1)}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            feedings
+            meals
           </div>
         </div>
 
         {/* Time Since Last */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
           <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-            Last Fed
+            Last Meal
           </div>
           <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
-            {formatHoursSince(timeSinceLastFeeding)}
+            {formatTimeSince().time}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">ago</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400">
+            {formatTimeSince().duration}
+          </div>
         </div>
       </div>
 
@@ -220,10 +233,10 @@ export function EatStats({ dailyStats }: EatStatsProps) {
           </div>
           <div className="text-right">
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
-              Total Feedings
+              Total Meals
             </div>
             <div className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-              {thisWeek.totalFeedings}
+              {thisWeek.totalMeals}
             </div>
           </div>
         </div>
