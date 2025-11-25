@@ -46,7 +46,7 @@ export function ResponsiveSleepTimeline({
   const innerHeight = height - margin.top - margin.bottom;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
-  const tooltipTimeout = useRef<number>();
+  const tooltipTimeout = useRef<number | undefined>(undefined);
 
   // Track which bar is currently highlighted
   const [highlightedBarId, setHighlightedBarId] = useState<string | null>(null);
