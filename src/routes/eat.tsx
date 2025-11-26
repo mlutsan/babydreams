@@ -75,7 +75,7 @@ function Eat() {
     if (!sheetUrl) {
       return;
     }
-    debugger;
+
     addMutation.mutate(
       {
         sheetUrl,
