@@ -3,7 +3,7 @@
  * Shows volume slider (0-200ml)
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAtomValue } from "jotai";
 import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link } from "konsta/react";
 import { X } from "lucide-react";
@@ -22,6 +22,36 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
 
   const displayName = babyName || "baby";
   const modalTitle = `How much did ${displayName} eat?`;
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (opened) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [opened]);
+
+  // Handle touch/click anywhere on slider track
+  const handleSliderInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const rect = target.getBoundingClientRect();
+
+    let clientX: number;
+    if ("touches" in e) {
+      clientX = e.touches[0]?.clientX || 0;
+    } else {
+      clientX = e.clientX;
+    }
+
+    const x = clientX - rect.left;
+    const percentage = Math.max(0, Math.min(1, x / rect.width));
+    const newValue = Math.round(percentage * 200 / 10) * 10; // Round to nearest 10
+    setVolume(newValue);
+  };
 
   const handleConfirm = () => {
     onConfirm(volume);
@@ -64,18 +94,22 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
 
           {/* Volume Slider */}
           <div className="space-y-2">
-            <div className="text-sm opacity-70 flex justify-between">
+            <div className="text-sm opacity-70 flex justify-between px-4">
               <span>0 ml</span>
               <span>200 ml</span>
             </div>
-            <Range
-              value={volume}
-              min={0}
-              max={200}
-              step={10}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              className="k-color-amber-500"
-            />
+            <div className="flex items-center gap-4 px-4">
+              <Range
+                value={volume}
+                min={0}
+                max={200}
+                step={10}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                onTouchStart={handleSliderInteraction}
+                onTouchMove={handleSliderInteraction}
+                onClick={handleSliderInteraction}
+              />
+            </div>
           </div>
 
           {/* Confirm Button */}

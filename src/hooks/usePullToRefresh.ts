@@ -16,6 +16,11 @@ interface UsePullToRefreshOptions {
    * Callback function to run on refresh
    */
   onRefresh?: () => Promise<void> | void;
+  /**
+   * Whether pull-to-refresh is enabled
+   * @default true
+   */
+  enabled?: boolean;
 }
 
 /**
@@ -23,7 +28,7 @@ interface UsePullToRefreshOptions {
  * Integrates with TanStack Query to invalidate queries
  */
 export function usePullToRefresh(options: UsePullToRefreshOptions = {}) {
-  const { threshold = 120, queryKeys, onRefresh } = options;
+  const { threshold = 120, queryKeys, onRefresh, enabled = true } = options;
   const queryClient = useQueryClient();
 
   const [startPoint, setStartPoint] = useState(0);
@@ -33,7 +38,9 @@ export function usePullToRefresh(options: UsePullToRefreshOptions = {}) {
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container) return;
+    if (!container || !enabled) {
+      return;
+    }
 
     const handleTouchStart = (e: TouchEvent) => {
       // Only start if scrolled to top
@@ -43,7 +50,9 @@ export function usePullToRefresh(options: UsePullToRefreshOptions = {}) {
     };
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (startPoint === 0 || isRefreshing) return;
+      if (startPoint === 0 || isRefreshing) {
+        return;
+      }
 
       const currentPoint = e.touches[0].pageY;
       const pullDistance = currentPoint - startPoint;
@@ -99,7 +108,7 @@ export function usePullToRefresh(options: UsePullToRefreshOptions = {}) {
       container.removeEventListener("touchmove", handleTouchMove);
       container.removeEventListener("touchend", handleTouchEnd);
     };
-  }, [startPoint, pullChange, threshold, isRefreshing, queryClient, queryKeys, onRefresh]);
+  }, [startPoint, pullChange, threshold, isRefreshing, queryClient, queryKeys, onRefresh, enabled]);
 
   return {
     containerRef,

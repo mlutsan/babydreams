@@ -17,6 +17,11 @@ interface PullToRefreshProps {
    * @default 85
    */
   threshold?: number;
+  /**
+   * Whether pull-to-refresh is enabled
+   * @default true
+   */
+  enabled?: boolean;
 }
 
 /**
@@ -28,11 +33,13 @@ export function PullToRefresh({
   queryKeys,
   onRefresh,
   threshold = 85,
+  enabled = false,
 }: PullToRefreshProps) {
   const { containerRef, pullChange, isRefreshing } = usePullToRefresh({
     threshold,
     queryKeys,
     onRefresh,
+    enabled,
   });
 
   // Calculate opacity and rotation for visual feedback

@@ -37,6 +37,18 @@ export function SleepModal({
   const [cycle, setCycle] = useState<"Day" | "Night">("Day");
   const timeInputRef = useRef<HTMLInputElement>(null);
 
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (opened) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [opened]);
+
   // Reset state when modal opens and auto-calculate cycle
   useEffect(() => {
     if (opened) {
