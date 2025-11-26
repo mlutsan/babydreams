@@ -135,17 +135,12 @@ export async function addEatEntry(params: {
   if (volume < 0 || volume > 200) {
     throw new Error("Volume must be between 0 and 200 ml");
   }
+  const now = dayjs();
 
-  // Current datetime as Excel serial number
-  const now = new Date();
-  const excelDatetime = (now.getTime() / 86400000) + 25569;
-
-  // Cycle date as Excel serial number (just the date part)
-  const cycleDateOnly = cycleDate.startOf("day").toDate();
-  const excelCycleDate = (cycleDateOnly.getTime() / 86400000) + 25569;
+  const cycleDateString = cycleDate.format("YYYY-MM-DD");
 
   const range = `${EAT_SHEET}!A:C`;
-  const values = [[excelDatetime, excelCycleDate, volume]];
+  const values = [[now.format("YYYY-MM-DD HH:mm"), cycleDateString, volume]];
 
   await appendSheetValues({ data: { sheetUrl, range, values } });
 }

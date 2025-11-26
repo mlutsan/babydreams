@@ -5,11 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { getEatHistory } from "~/lib/eat-service";
-import { getHistory } from "~/lib/history-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
 import { EatStats } from "~/components/mobile/EatStats";
 import { useEatMutation } from "~/hooks/useEatMutation";
+import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/eat")({
@@ -26,13 +26,8 @@ function Eat() {
     setIsHydrated(true);
   }, []);
 
-  // Query for sleep history to get current cycle date
-  const { data: sleepStats } = useQuery({
-    queryKey: ["history", sheetUrl],
-    queryFn: () => getHistory(sheetUrl),
-    enabled: isHydrated && !!sheetUrl,
-    staleTime: 5 * 60 * 1000,
-  });
+  // Get today's sleep stat for current cycle date
+  const { todayStat: todaySleepStat } = useTodaySleepStat();
 
   // Query for all eating history
   const { data: allStats, isLoading } = useQuery({
@@ -67,31 +62,20 @@ function Eat() {
 
   // Determine current cycle date from sleep stats
   const currentCycleDate = useMemo(() => {
-    if (!sleepStats || sleepStats.length === 0) {
-      // No sleep data - use current calendar date
-      return dayjs();
-    }
-
-    const now = dayjs();
-    // Find today's sleep stat
-    const todaySleepStat = sleepStats.find((stat) =>
-      stat.endDatetime.isSame(now, "day")
-    );
-
     if (todaySleepStat) {
       // Use the cycle date from today's sleep stat
       return todaySleepStat.startDatetime;
     }
 
-    // Fallback to current date
+    // Fallback to current date if no sleep data
     return dayjs();
-  }, [sleepStats]);
+  }, [todaySleepStat]);
 
   const handleAddMeal = (volume: number) => {
     if (!sheetUrl) {
       return;
     }
-
+    debugger;
     addMutation.mutate(
       {
         sheetUrl,

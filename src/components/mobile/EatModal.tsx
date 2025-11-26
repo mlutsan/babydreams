@@ -49,6 +49,19 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
             <h3 className="text-xl font-semibold">{modalTitle}</h3>
           </div>
 
+
+
+
+          {/* Volume Display */}
+          <div className="text-center">
+            <div className="text-6xl font-bold text-amber-600">
+              {volume}
+            </div>
+            <div className="text-xl text-gray-600 dark:text-gray-400 mt-2">
+              ml
+            </div>
+          </div>
+
           {/* Volume Slider */}
           <div className="space-y-2">
             <div className="text-sm opacity-70 flex justify-between">
@@ -65,18 +78,6 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
             />
           </div>
 
-
-          {/* Volume Display */}
-          <div className="text-center">
-            <div className="text-6xl font-bold text-amber-600">
-              {volume}
-            </div>
-            <div className="text-xl text-gray-600 dark:text-gray-400 mt-2">
-              ml
-            </div>
-          </div>
-
-
           {/* Confirm Button */}
           <div className="mt-8">
             <Button
@@ -86,7 +87,7 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
               disabled={isLoading}
               className="bg-amber-500 active:bg-amber-600"
             >
-              {isLoading ? "Saving..." : "Confirm"}
+              {isLoading ? "Om-nom-noming..." : "Confirm"}
             </Button>
           </div>
         </div>
