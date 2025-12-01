@@ -41,4 +41,90 @@
     font-family:
       source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
   }
+
+  /* Sleep state transition animations */
+  @keyframes sunSet {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translate(60px, 30px) scale(0.8);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(100px, 80px) scale(0.5);
+      opacity: 0;
+    }
+  }
+
+  @keyframes moonRise {
+    0% {
+      transform: translate(100px, 80px) scale(0.5);
+      opacity: 0;
+    }
+    50% {
+      transform: translate(60px, 30px) scale(0.8);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes sunRise {
+    0% {
+      transform: translate(-100px, 80px) scale(0.5);
+      opacity: 0;
+    }
+    50% {
+      transform: translate(-60px, 30px) scale(0.8);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes moonSet {
+    0% {
+      transform: translate(0, 0) scale(1);
+      opacity: 1;
+    }
+    50% {
+      transform: translate(-60px, 30px) scale(0.8);
+      opacity: 0.5;
+    }
+    100% {
+      transform: translate(-100px, 80px) scale(0.5);
+      opacity: 0;
+    }
+  }
+
+  .animate-sun-set {
+    animation: sunSet 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+
+  .animate-moon-rise {
+    animation: moonRise 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+
+  .animate-sun-rise {
+    animation: sunRise 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+
+  .animate-moon-set {
+    animation: moonSet 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-sun-set,
+    .animate-moon-rise,
+    .animate-sun-rise,
+    .animate-moon-set {
+      animation: none;
+    }
+  }
 }

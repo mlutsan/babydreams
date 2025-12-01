@@ -1,7 +1,7 @@
 "use client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { Moon, Sun, History as HistoryIcon } from "lucide-react";
@@ -22,6 +22,10 @@ function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [now, setNow] = useState(dayjs());
 
+  // Animation state tracking
+  const previousSleepingRef = useRef<boolean | null>(null);
+  const [animationState, setAnimationState] = useState<'awake-to-sleep' | 'sleep-to-awake' | null>(null);
+
   // Use the shared sleep history hook
   const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
 
@@ -33,6 +37,31 @@ function Home() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Detect sleep state transitions and trigger animations
+  useEffect(() => {
+    const isSleeping = sleepState?.isActive || false;
+
+    if (previousSleepingRef.current !== null && previousSleepingRef.current !== isSleeping) {
+      // State changed - trigger animation
+      if (isSleeping) {
+        // Was awake, now sleeping
+        setAnimationState("awake-to-sleep");
+      } else {
+        // Was sleeping, now awake
+        setAnimationState("sleep-to-awake");
+      }
+
+      // Clear animation state after animation completes
+      const timeout = setTimeout(() => {
+        setAnimationState(null);
+      }, 1000);
+
+      return () => clearTimeout(timeout);
+    }
+
+    previousSleepingRef.current = isSleeping;
+  }, [sleepState?.isActive]);
 
   // Calculate current awake duration in real-time
   const currentAwakeDuration = useMemo(() => {
@@ -132,8 +161,21 @@ function Home() {
         <div className="flex flex-col items-center gap-3">
           {sleepState?.isActive ? (
             <>
-              <div className="text-5xl">
-                😴
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                {animationState === "awake-to-sleep" ? (
+                  <>
+                    <div className="absolute text-5xl animate-sun-set">
+                      <Sun className="w-12 h-12" />
+                    </div>
+                    <div className="absolute text-5xl animate-moon-rise">
+                      😴
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-5xl">
+                    😴
+                  </div>
+                )}
               </div>
               <div className="text-xl font-semibold">
                 {displayName} is Sleeping
@@ -144,8 +186,21 @@ function Home() {
             </>
           ) : sleepState?.awakeStartTime ? (
             <>
-              <div className="text-5xl">
-                <Sun className="w-12 h-12" />
+              <div className="relative w-20 h-20 flex items-center justify-center">
+                {animationState === "sleep-to-awake" ? (
+                  <>
+                    <div className="absolute text-5xl animate-moon-set">
+                      😴
+                    </div>
+                    <div className="absolute text-5xl animate-sun-rise">
+                      <Sun className="w-12 h-12" />
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-5xl">
+                    <Sun className="w-12 h-12" />
+                  </div>
+                )}
               </div>
               <div className="text-xl font-semibold">
                 {displayName} is Awake
