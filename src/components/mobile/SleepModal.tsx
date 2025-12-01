@@ -184,24 +184,26 @@ export function SleepModal({
             </Button>
           </div>
 
-          {/* Cycle Selection */}
-          <div className="space-y-2">
-            <div className="text-sm opacity-70 text-center">Day or night cycle?</div>
-            <Segmented rounded strong>
-              <SegmentedButton
-                active={cycle === "Day"}
-                onClick={() => setCycle("Day")}
-              >
-                Day
-              </SegmentedButton>
-              <SegmentedButton
-                active={cycle === "Night"}
-                onClick={() => setCycle("Night")}
-              >
-                Night
-              </SegmentedButton>
-            </Segmented>
-          </div>
+          {/* Cycle Selection - only show when putting baby to sleep */}
+          {!isSleeping && (
+            <div className="space-y-2">
+              <div className="text-sm opacity-70 text-center">Day or night cycle?</div>
+              <Segmented rounded strong>
+                <SegmentedButton
+                  active={cycle === "Day"}
+                  onClick={() => setCycle("Day")}
+                >
+                  Day
+                </SegmentedButton>
+                <SegmentedButton
+                  active={cycle === "Night"}
+                  onClick={() => setCycle("Night")}
+                >
+                  Night
+                </SegmentedButton>
+              </Segmented>
+            </div>
+          )}
 
           {/* Confirm Button */}
           <div className="mt-8">

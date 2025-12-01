@@ -1,7 +1,7 @@
 "use client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { Moon, Sun, History as HistoryIcon } from "lucide-react";
@@ -10,6 +10,7 @@ import { SleepModal } from "~/components/mobile/SleepModal";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useSleepMutation } from "~/hooks/useSleepMutation";
+import dayjs from "dayjs";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -19,13 +20,42 @@ function Home() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const babyName = useAtomValue(babyNameAtom);
   const [modalOpen, setModalOpen] = useState(false);
+  const [now, setNow] = useState(dayjs());
 
   // Use the shared sleep history hook
   const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
 
+  // Update 'now' every minute to refresh awake time display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(dayjs());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate current awake duration in real-time
+  const currentAwakeDuration = useMemo(() => {
+    if (!sleepState || sleepState.isActive) {
+      return 0;
+    }
+
+    // Get the latest stat entry (could be today or yesterday)
+    const latestStat = allStats?.[allStats.length - 1];
+    const lastEntry = latestStat?.entries[latestStat.entries.length - 1];
+
+    if (!lastEntry?.endTime) {
+      return 0;
+    }
+
+    const awakeStart = lastEntry.date.startOf("day").add(lastEntry.endTime);
+    return Math.round((now.unix() - awakeStart.unix()) / 60);
+  }, [sleepState, allStats, now]);
+
   const todayStats = todayStat ? {
     sleepMinutes: todayStat.totalSleepMinutes,
-    awakeMinutes: todayStat.awakeMinutes,
+    // Include both past awake time and current awake duration
+    awakeMinutes: todayStat.awakeMinutes + currentAwakeDuration,
   } : null;
 
   // Calculate historical averages for comparison (last 7 days excluding today)
@@ -103,7 +133,7 @@ function Home() {
           {sleepState?.isActive ? (
             <>
               <div className="text-5xl">
-                <Moon className="w-12 h-12" />
+                😴
               </div>
               <div className="text-xl font-semibold">
                 {displayName} is Sleeping
@@ -242,7 +272,6 @@ function Home() {
         {allStats && allStats.length > 0 && (
           <ResponsiveSleepTimeline
             allDayStats={allStats}
-            height={600}
           />
         )}
       </Block>

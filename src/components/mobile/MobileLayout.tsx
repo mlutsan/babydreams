@@ -53,7 +53,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
           />
           <PullToRefresh queryKeys={queryKeys}>
             {children}
-            <div className="h-[150px]"></div>
+            <div className="h-[180px]"></div>
           </PullToRefresh>
 
 

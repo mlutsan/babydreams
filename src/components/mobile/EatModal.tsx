@@ -3,22 +3,26 @@
  * Shows volume slider (0-200ml)
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link } from "konsta/react";
 import { X } from "lucide-react";
 import { babyNameAtom } from "~/lib/atoms";
+import dayjs from "dayjs";
+import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
 
 interface EatModalProps {
   opened: boolean;
   onClose: () => void;
-  onConfirm: (volume: number) => void;
+  onConfirm: (volume: number, time: string) => void;
   isLoading?: boolean; // Is data being saved?
 }
 
 export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatModalProps) {
   const babyName = useAtomValue(babyNameAtom);
   const [volume, setVolume] = useState(100); // Default 100ml
+  const [selectedTime, setSelectedTime] = useState("");
+  const timeInputRef = useRef<HTMLInputElement>(null);
 
   const displayName = babyName || "baby";
   const modalTitle = `How much did ${displayName} eat?`;
@@ -33,6 +37,13 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
     return () => {
       document.body.style.overflow = "";
     };
+  }, [opened]);
+
+  // Reset time when opening
+  useEffect(() => {
+    if (opened) {
+      setSelectedTime(dayjs().format("HH:mm"));
+    }
   }, [opened]);
 
   // Handle touch/click anywhere on slider track
@@ -54,7 +65,26 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
   };
 
   const handleConfirm = () => {
-    onConfirm(volume);
+    if (!selectedTime) return;
+    onConfirm(volume, selectedTime);
+  };
+
+  const handleTimeAdjustment = (minutes: number) => {
+    if (!selectedTime) {
+      return;
+    }
+    const newTime = addMinutesToTime(selectedTime, minutes);
+    setSelectedTime(newTime);
+  };
+
+  const getTimeAgo = () => {
+    if (!selectedTime) {
+      return "Select time";
+    }
+    const minutesAgo = getTimeAgoFromManualInput(selectedTime);
+    if (minutesAgo === 0) return "Now";
+    if (minutesAgo < 0) return `${Math.abs(minutesAgo)} min ahead`;
+    return `${minutesAgo} min ago`;
   };
 
   return (
@@ -78,10 +108,6 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
           <div className="text-center">
             <h3 className="text-xl font-semibold">{modalTitle}</h3>
           </div>
-
-
-
-
           {/* Volume Display */}
           <div className="text-center">
             <div className="text-6xl font-bold text-amber-600">
@@ -109,6 +135,30 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
                 onTouchMove={handleSliderInteraction}
                 onClick={handleSliderInteraction}
               />
+            </div>
+          </div>
+
+          {/* Time Selection */}
+          <div className="space-y-2">
+            <div className="flex justify-center">
+              <div className="flex items-center gap-2">
+                <input
+                  ref={timeInputRef}
+                  type="time"
+                  value={selectedTime}
+                  onChange={(e) => setSelectedTime(e.target.value)}
+                  className="text-center text-3xl font-semibold bg-transparent border-none focus:outline-none focus:ring-2 focus:ring-amber-500 rounded-lg px-3 py-1"
+                />
+              </div>
+            </div>
+            <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+              {getTimeAgo()}
+            </div>
+            <div className="flex justify-center gap-1">
+              <Button outline rounded small onClick={() => handleTimeAdjustment(-10)}>-10 min</Button>
+              <Button outline rounded small onClick={() => handleTimeAdjustment(-5)}>-5 min</Button>
+              <Button outline rounded small onClick={() => handleTimeAdjustment(5)}>+5 min</Button>
+              <Button outline rounded small onClick={() => handleTimeAdjustment(10)}>+10 min</Button>
             </div>
           </div>
 

@@ -128,19 +128,43 @@ export async function addEatEntry(params: {
   sheetUrl: string;
   volume: number;
   cycleDate: dayjs.Dayjs; // Logical date from sleep tracking
+  time?: string; // Optional HH:mm manual time
+  dayStartHour?: number; // Hour when day starts (default: 8)
 }): Promise<void> {
-  const { sheetUrl, volume, cycleDate } = params;
+  const { sheetUrl, volume, cycleDate, time, dayStartHour = 8 } = params;
 
   // Validation
   if (volume < 0 || volume > 200) {
     throw new Error("Volume must be between 0 and 200 ml");
   }
-  const now = dayjs();
 
-  const cycleDateString = cycleDate.format("YYYY-MM-DD");
+  // Determine the actual datetime and cycle date
+  const entryDate = cycleDate.startOf("day");
+  let actualDatetime: dayjs.Dayjs;
+
+  if (time) {
+    // Manual time entry
+    const [hours, minutes] = time.split(":").map(Number);
+
+    // If time is between 00:00 and dayStart, it's the next calendar day
+    if (hours >= 0 && hours < dayStartHour) {
+      // This is early morning (night portion)
+      // Actual datetime is NEXT calendar day
+      actualDatetime = entryDate.add(1, "day").hour(hours).minute(minutes).second(0);
+      // Cycle date is also NEXT day (this night belongs to tomorrow's logical day)
+    } else {
+      // Regular time during the day
+      actualDatetime = entryDate.hour(hours).minute(minutes).second(0);
+    }
+  } else {
+    // Current time
+    actualDatetime = dayjs();
+  }
+
+  const cycleDateString = cycleDate.startOf("day").format("YYYY-MM-DD");
 
   const range = `${EAT_SHEET}!A:C`;
-  const values = [[now.format("YYYY-MM-DD HH:mm"), cycleDateString, volume]];
+  const values = [[actualDatetime.format("YYYY-MM-DD HH:mm"), cycleDateString, volume]];
 
   await appendSheetValues({ data: { sheetUrl, range, values } });
 }

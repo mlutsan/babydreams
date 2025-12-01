@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { sheetUrlAtom } from "~/lib/atoms";
+import { sheetUrlAtom, babyNameAtom, cycleSettingsAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { getEatHistory } from "~/lib/eat-service";
 import { EatModal } from "~/components/mobile/EatModal";
@@ -10,6 +10,7 @@ import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
 import { EatStats } from "~/components/mobile/EatStats";
 import { useEatMutation } from "~/hooks/useEatMutation";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { Milk } from "lucide-react";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/eat")({
@@ -18,19 +19,35 @@ export const Route = createFileRoute("/eat")({
 
 function Eat() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
+  const babyName = useAtomValue(babyNameAtom);
   const [modalOpen, setModalOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
+  const [now, setNow] = useState(dayjs());
 
   // Wait for atoms to hydrate from storage
   useEffect(() => {
     setIsHydrated(true);
   }, []);
 
+  // Update 'now' every minute to refresh time since last meal
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNow(dayjs());
+    }, 60000); // Update every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   // Get today's sleep stat for current cycle date
-  const { todayStat: todaySleepStat } = useTodaySleepStat();
+  const sleepQuery = useTodaySleepStat();
+  const {
+    todayStat: todaySleepStat,
+    isFetched: isSleepFetched,
+    allStats: allSleepStats,
+  } = sleepQuery;
 
   // Query for all eating history
-  const { data: allStats, isLoading } = useQuery({
+  const { data: allStats, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["eatHistory", sheetUrl],
     queryFn: () => getEatHistory(sheetUrl),
     enabled: isHydrated && !!sheetUrl,
@@ -38,24 +55,24 @@ function Eat() {
     refetchInterval: 60000, // Refresh every minute
   });
 
-  // Find today's and yesterday's stats
-  const { todayStat, yesterdayStat } = useMemo(() => {
+  // Find today's stat using sleep's logical date
+  const todayStat = useMemo(() => {
     if (!allStats || allStats.length === 0) {
-      return { todayStat: null, yesterdayStat: null };
+      return null;
     }
 
     const now = dayjs();
-    const yesterday = now.subtract(1, "day");
+
+    // Use sleep's logical date when available, fallback to calendar date
+    const todayLogicalDate = todaySleepStat?.logicalDate
+      ?? now.format("YYYY-MM-DD");
 
     const today = allStats.find((stat) =>
-      stat.date.isSame(now, "day")
-    );
-    const yest = allStats.find((stat) =>
-      stat.date.isSame(yesterday, "day")
+      stat.date.format("YYYY-MM-DD") === todayLogicalDate
     );
 
-    return { todayStat: today || null, yesterdayStat: yest || null };
-  }, [allStats]);
+    return today || null;
+  }, [allStats, todaySleepStat]);
 
   // Use the reusable eat mutation hook
   const addMutation = useEatMutation();
@@ -67,12 +84,30 @@ function Eat() {
       return todaySleepStat.startDatetime;
     }
 
-    // Fallback to current date if no sleep data
-    return dayjs();
-  }, [todaySleepStat]);
+    // Only fallback once sleep data has settled
+    if (isSleepFetched) {
+      return dayjs();
+    }
 
-  const handleAddMeal = (volume: number) => {
-    if (!sheetUrl) {
+    return null;
+  }, [todaySleepStat, isSleepFetched]);
+
+  // Calculate time since last meal in HH:mm format (must be before any returns)
+  const lastMeal = todayStat?.entries[todayStat.entries.length - 1];
+  const timeSinceLastMeal = useMemo(() => {
+    if (!lastMeal) {
+      return null;
+    }
+
+    const diffMinutes = now.diff(lastMeal.datetime, "minutes");
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }, [lastMeal, now]);
+
+  const handleAddMeal = (volume: number, time: string) => {
+    if (!sheetUrl || !currentCycleDate) {
       return;
     }
 
@@ -81,6 +116,7 @@ function Eat() {
         sheetUrl,
         volume,
         cycleDate: currentCycleDate,
+        time,
       },
       {
         onSuccess: () => {
@@ -117,65 +153,84 @@ function Eat() {
     );
   }
 
+  if (isError) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load meal history.";
+    return (
+      <Block className="text-center py-8 space-y-3">
+        <div className="font-semibold">Couldn&apos;t load meals</div>
+        <p className="text-sm opacity-70">{message}</p>
+        <Button outline onClick={() => refetch()}>
+          Retry
+        </Button>
+      </Block>
+    );
+  }
+
+  const displayName = babyName || "Baby";
+
   return (
     <>
+      {/* Status Card */}
       <Block strong inset>
-        <div className="grid grid-cols-2 gap-4 py-4">
-          {/* Today */}
-          <div className="text-center">
-            <div className="text-sm font-medium mb-2 opacity-70">Today</div>
-            {todayStat ? (
-              <>
-                <div className="text-3xl font-bold text-amber-600 mb-1">
-                  {todayStat.totalVolume} ml
-                </div>
-                <div className="text-xs opacity-60">
-                  {todayStat.entryCount} meal{todayStat.entryCount !== 1 ? "s" : ""}
-                </div>
-              </>
-            ) : (
-              <div className="text-sm opacity-40">No data</div>
-            )}
-
+        <div className="flex flex-col items-center gap-3">
+          <div className="text-5xl">
+            <Milk className="w-12 h-12 text-amber-600" />
           </div>
-
-          {/* Yesterday */}
-          <div className="text-center">
-            <div className="text-sm font-medium mb-2 opacity-70">Yesterday</div>
-            {yesterdayStat ? (
-              <>
-                <div className="text-3xl font-bold text-gray-700 dark:text-gray-300 mb-1">
-                  {yesterdayStat.totalVolume} ml
+          {todayStat && todayStat.totalVolume > 0 ? (
+            <>
+              <div className="text-2xl font-semibold">
+                {todayStat.totalVolume} ml
+              </div>
+              {lastMeal && (
+                <div className="gap-0 flex flex-col items-center mt-2 text-base opacity-70">
+                  <div className="">
+                    <span className="font-medium">
+                      {lastMeal.datetime.format("HH:mm")}
+                      {" · "}
+                      {timeSinceLastMeal && `${timeSinceLastMeal}`} ago
+                    </span>
+                    {" · "}
+                    <span>{lastMeal.volume} ml</span>
+                  </div>
+                  <div className="text-xs">
+                    last meal
+                  </div>
                 </div>
-                <div className="text-xs opacity-60">
-                  {yesterdayStat.entryCount} meal{yesterdayStat.entryCount !== 1 ? "s" : ""}
-                </div>
-              </>
-            ) : (
-              <div className="text-sm opacity-40">No data</div>
-            )}
-          </div>
+              )}
+            </>
+          ) : allStats && allStats.length > 0 ? (
+            <>
+              <div className="text-xl font-semibold">
+                Today no meals yet
+              </div>
+              <div className="text-sm opacity-70">Track {displayName}&apos;s feeding below</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xl font-semibold">No meal data yet</div>
+              <div className="text-sm opacity-70">Start tracking below</div>
+            </>
+          )}
         </div>
-
         <Button
           large
           rounded
           onClick={() => setModalOpen(true)}
-          disabled={addMutation.isPending}
+          disabled={addMutation.isPending || !currentCycleDate}
           className="w-full bg-amber-500 active:bg-amber-600 mt-4"
         >
-          {addMutation.isPending ? "Nom nom nom..." : "Add Meal"}
+          {addMutation.isPending
+            ? "Nom nom nom..."
+            : !currentCycleDate
+              ? "Loading sleep data..."
+              : "Add Meal"}
         </Button>
       </Block>
 
       {/* Weekly Trends & Insights */}
       {allStats && allStats.length > 0 && (
-        <>
-          <BlockTitle>Insights</BlockTitle>
-          <Block strong inset>
-            <EatStats dailyStats={allStats} />
-          </Block>
-        </>
+        <EatStats dailyStats={allStats} />
       )}
 
       {/* Meal Overview Chart */}
@@ -183,7 +238,7 @@ function Eat() {
         <>
           {/* <BlockTitle>Meal History</BlockTitle> */}
           <Block strong inset>
-            <EatOverviewChart dailyStats={allStats} height={240} />
+            <EatOverviewChart dailyStats={allStats} sleepStats={allSleepStats} />
           </Block>
         </>
       )}

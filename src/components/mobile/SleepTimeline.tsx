@@ -16,7 +16,7 @@ import { Text } from "@visx/text";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 import type { DailyStat } from "~/types/sleep";
-import { formatDuration } from "~/lib/date-utils";
+import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 
 interface SleepBar {
   id: string;
@@ -31,19 +31,31 @@ interface SleepBar {
   endTime: string;
 }
 
+interface DailySleepBar {
+  type: "daily";
+  date: dayjs.Dayjs;
+  totalMinutes: number;
+  sessionCount: number;
+}
+
+type TooltipData = SleepBar | DailySleepBar;
+
 interface ResponsiveSleepTimelineProps {
   allDayStats: DailyStat[];
   height?: number;
 }
 
 const DAY_COLUMN_WIDTH = 60; // Width per day column
+const TIMELINE_HEIGHT = 400;
+const BAR_CHART_HEIGHT = 200;
+const GAP_BETWEEN_SECTIONS = 40;
 
 export function ResponsiveSleepTimeline({
   allDayStats,
-  height = 600,
+  height = TIMELINE_HEIGHT + BAR_CHART_HEIGHT + GAP_BETWEEN_SECTIONS + 50, // margin top + bottom
 }: ResponsiveSleepTimelineProps) {
   const margin = { top: 40, right: 50, bottom: 10, left: 50 };
-  const innerHeight = height - margin.top - margin.bottom;
+  const innerHeight = TIMELINE_HEIGHT;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
   const tooltipTimeout = useRef<number | undefined>(undefined);
@@ -59,7 +71,7 @@ export function ResponsiveSleepTimeline({
     tooltipOpen,
     showTooltip,
     hideTooltip,
-  } = useTooltip<SleepBar>();
+  } = useTooltip<TooltipData>();
 
   const { containerRef, TooltipInPortal } = useTooltipInPortal({
     scroll: true,
@@ -161,6 +173,21 @@ export function ResponsiveSleepTimeline({
       : "#003ea1"; // darker blue for night sleep
   };
 
+  // Calculate daily total sleep in minutes for bar chart
+  const dailyTotals = useMemo(() => {
+    return allDayStats.map((dayStat) => ({
+      date: dayjs(dayStat.logicalDate),
+      totalMinutes: dayStat.totalSleepMinutes,
+    }));
+  }, [allDayStats]);
+
+  // Scale for bar chart
+  const maxSleepMinutes = Math.max(...dailyTotals.map((d) => d.totalMinutes), 60);
+  const barSleepScale = scaleLinear({
+    domain: [0, maxSleepMinutes],
+    range: [BAR_CHART_HEIGHT, 0],
+  });
+
   // Current time indicator position (if today is visible)
   const todayIndex = allDayStats.findIndex((stat) => {
     return dayjs(stat.logicalDate).isSame(dayjs(), "day");
@@ -209,6 +236,38 @@ export function ResponsiveSleepTimeline({
     tooltipTimeout.current = window.setTimeout(() => {
       hideTooltip();
       setHighlightedBarId(null);
+    }, 300);
+  };
+
+  // Handle total bar tooltip
+  const handleTotalBarInteraction = (
+    event: React.MouseEvent | React.TouchEvent,
+    dayStat: DailyStat,
+    barX: number
+  ) => {
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+    }
+
+    const eventSvgCoords = localPoint(event);
+    const left = barX + columnWidth / 2;
+    const top = (eventSvgCoords?.y || 0) - 80;
+
+    showTooltip({
+      tooltipData: {
+        type: "daily",
+        date: dayjs(dayStat.logicalDate),
+        totalMinutes: dayStat.totalSleepMinutes,
+        sessionCount: dayStat.sessionCount,
+      },
+      tooltipTop: top,
+      tooltipLeft: left,
+    });
+  };
+
+  const handleTotalBarLeave = () => {
+    tooltipTimeout.current = window.setTimeout(() => {
+      hideTooltip();
     }, 300);
   };
 
@@ -395,6 +454,95 @@ export function ResponsiveSleepTimeline({
               />
             )}
           </Group>
+
+          {/* Bar Chart Section */}
+          <Group
+            left={margin.left}
+            top={margin.top + TIMELINE_HEIGHT + GAP_BETWEEN_SECTIONS}
+          >
+            {/* Grid lines for bar chart */}
+            {barSleepScale.ticks(5).map((tick) => {
+              const y = barSleepScale(tick);
+              return (
+                <Line
+                  key={`bar-grid-${tick}`}
+                  from={{ x: 0, y }}
+                  to={{ x: innerWidth, y }}
+                  stroke="#e2e8f0"
+                  strokeWidth={1}
+                  strokeDasharray="2,2"
+                />
+              );
+            })}
+
+            {/* Daily total sleep bars */}
+            {dailyTotals.map((dayTotal, dayIndex) => {
+              const x = dayScale(dayIndex.toString()) || 0;
+              const barHeight = Math.max(2, BAR_CHART_HEIGHT - barSleepScale(dayTotal.totalMinutes));
+              const barY = BAR_CHART_HEIGHT - barHeight;
+              const dayStat = allDayStats[dayIndex];
+
+              return (
+                <g key={`bar-group-${dayIndex}`}>
+                  <Bar
+                    x={x}
+                    y={barY}
+                    width={columnWidth}
+                    height={barHeight}
+                    fill="#60a5fa"
+                    rx={2}
+                    onMouseMove={(event) => handleTotalBarInteraction(event, dayStat, x)}
+                    onMouseLeave={handleTotalBarLeave}
+                    style={{ cursor: "pointer" }}
+                  />
+                  {/* Sleep duration label inside bar */}
+                  {barHeight > 40 && (
+                    <Text
+                      x={x + columnWidth / 2}
+                      y={barY + barHeight - 5}
+                      fontSize={10}
+                      fontWeight="600"
+                      fill="#1e3a8a"
+                      textAnchor="middle"
+                    >
+                      {formatDurationHHMM(dayTotal.totalMinutes)}
+                    </Text>
+                  )}
+                </g>
+              );
+            })}
+
+            {/* Sleep duration axis (left) */}
+            <AxisLeft
+              scale={barSleepScale}
+              numTicks={5}
+              tickFormat={(d) => formatDurationHHMM(Number(d))}
+              stroke="#cbd5e1"
+              tickStroke="#cbd5e1"
+              tickLabelProps={() => ({
+                fill: "#64748b",
+                fontSize: 10,
+                textAnchor: "end",
+                dx: -5,
+              })}
+            />
+
+            {/* Sleep duration axis (right) */}
+            <AxisRight
+              left={innerWidth}
+              scale={barSleepScale}
+              numTicks={5}
+              tickFormat={(d) => formatDurationHHMM(Number(d))}
+              stroke="#cbd5e1"
+              tickStroke="#cbd5e1"
+              tickLabelProps={() => ({
+                fill: "#64748b",
+                fontSize: 10,
+                textAnchor: "start",
+                dx: 5,
+              })}
+            />
+          </Group>
         </svg>
       </div>
 
@@ -406,21 +554,37 @@ export function ResponsiveSleepTimeline({
           style={{ ...defaultStyles, backgroundColor: "" }}
           className="z-1000 bg-gray-200 dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700"
         >
-          <div className="text-sm space-y-1">
-            <div className="font-semibold text-gray-900 dark:text-gray-100">
-              {tooltipData.cycle} Sleep
-              {tooltipData.isActive && " (Active)"}
+          {"type" in tooltipData && tooltipData.type === "daily" ? (
+            <div className="text-sm space-y-1">
+              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                {tooltipData.date.format("MMM D, YYYY")}
+              </div>
+              <div className="text-gray-700 dark:text-gray-300">
+                Total: {formatDurationHHMM(tooltipData.totalMinutes)}
+              </div>
+              <div className="text-gray-600 dark:text-gray-400">
+                {tooltipData.sessionCount} session{tooltipData.sessionCount !== 1 ? "s" : ""}
+              </div>
             </div>
-            <div className="text-gray-600 dark:text-gray-400 text-xs">
-              {dayjs(tooltipData.logicalDate).format("MMM D, YYYY")}
+          ) : (
+            <div className="text-sm space-y-1">
+              <div className="font-semibold text-gray-900 dark:text-gray-100">
+                {"cycle" in tooltipData && tooltipData.cycle} Sleep
+                {"isActive" in tooltipData && tooltipData.isActive && " (Active)"}
+              </div>
+              <div className="text-gray-600 dark:text-gray-400 text-xs">
+                {"logicalDate" in tooltipData && dayjs(tooltipData.logicalDate).format("MMM D, YYYY")}
+              </div>
+              <div className="text-gray-600 dark:text-gray-400">
+                {"startTime" in tooltipData && "endTime" in tooltipData &&
+                  `${tooltipData.startTime} → ${tooltipData.endTime}`}
+              </div>
+              <div className="text-gray-700 dark:text-gray-300">
+                {"durationMinutes" in tooltipData &&
+                  `Duration: ${formatDuration(tooltipData.durationMinutes)}`}
+              </div>
             </div>
-            <div className="text-gray-600 dark:text-gray-400">
-              {tooltipData.startTime} → {tooltipData.endTime}
-            </div>
-            <div className="text-gray-700 dark:text-gray-300">
-              Duration: {formatDuration(tooltipData.durationMinutes)}
-            </div>
-          </div>
+          )}
         </TooltipInPortal>
       )}
     </div>
