@@ -7,10 +7,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import {
   GoogleSheetsClient,
-  type ValueRange,
-  type UpdateValuesResponse,
-  type AppendValuesResponse,
-  type Spreadsheet,
 } from "~/lib/google-sheets";
 import { extractSpreadsheetId } from "~/lib/sheets-utils";
 
@@ -29,9 +25,13 @@ async function getClient(sheetUrl: string) {
  * Get values from a range (uses UNFORMATTED_VALUE + SERIAL_NUMBER)
  */
 export const getSheetValues = createServerFn({ method: "POST" })
-  .inputValidator((data: { sheetUrl: string; range: string }) => {
-    if (!data.sheetUrl) throw new Error("Sheet URL is required");
-    if (!data.range) throw new Error("Range is required");
+  .inputValidator((data: { sheetUrl: string; range: string; }) => {
+    if (!data.sheetUrl) {
+      throw new Error("Sheet URL is required");
+    }
+    if (!data.range) {
+      throw new Error("Range is required");
+    }
     return data;
   })
   .handler(async ({ data }) => {
@@ -50,9 +50,15 @@ export const appendSheetValues = createServerFn({ method: "POST" })
     insertDataOption?: "OVERWRITE" | "INSERT_ROWS";
     valueInputOption?: "RAW" | "USER_ENTERED";
   }) => {
-    if (!data.sheetUrl) throw new Error("Sheet URL is required");
-    if (!data.range) throw new Error("Range is required");
-    if (!data.values) throw new Error("Values are required");
+    if (!data.sheetUrl) {
+      throw new Error("Sheet URL is required");
+    }
+    if (!data.range) {
+      throw new Error("Range is required");
+    }
+    if (!data.values) {
+      throw new Error("Values are required");
+    }
     return data;
   })
   .handler(async ({ data }) => {
@@ -75,9 +81,15 @@ export const updateSheetValues = createServerFn({ method: "POST" })
     values: unknown[][];
     valueInputOption?: "RAW" | "USER_ENTERED";
   }) => {
-    if (!data.sheetUrl) throw new Error("Sheet URL is required");
-    if (!data.range) throw new Error("Range is required");
-    if (!data.values) throw new Error("Values are required");
+    if (!data.sheetUrl) {
+      throw new Error("Sheet URL is required");
+    }
+    if (!data.range) {
+      throw new Error("Range is required");
+    }
+    if (!data.values) {
+      throw new Error("Values are required");
+    }
     return data;
   })
   .handler(async ({ data }) => {
@@ -93,8 +105,10 @@ export const updateSheetValues = createServerFn({ method: "POST" })
  * Get spreadsheet metadata
  */
 export const getSheetMetadata = createServerFn({ method: "POST" })
-  .inputValidator((data: { sheetUrl: string }) => {
-    if (!data.sheetUrl) throw new Error("Sheet URL is required");
+  .inputValidator((data: { sheetUrl: string; }) => {
+    if (!data.sheetUrl) {
+      throw new Error("Sheet URL is required");
+    }
     return data;
   })
   .handler(async ({ data }) => {

@@ -65,7 +65,9 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
   };
 
   const handleConfirm = () => {
-    if (!selectedTime) return;
+    if (!selectedTime) {
+      return;
+    }
     onConfirm(volume, selectedTime);
   };
 
@@ -82,8 +84,12 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
       return "Select time";
     }
     const minutesAgo = getTimeAgoFromManualInput(selectedTime);
-    if (minutesAgo === 0) return "Now";
-    if (minutesAgo < 0) return `${Math.abs(minutesAgo)} min ahead`;
+    if (minutesAgo === 0) {
+      return "Now";
+    }
+    if (minutesAgo < 0) {
+      return `${Math.abs(minutesAgo)} min ahead`;
+    }
     return `${minutesAgo} min ago`;
   };
 

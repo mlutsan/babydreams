@@ -67,11 +67,11 @@ const TIME_BUCKETS: Array<{
   endHour: number;
   wraps?: boolean;
 }> = [
-    { key: "morning", label: "Morning", startHour: 6, endHour: 11 },
-    { key: "afternoon", label: "Afternoon", startHour: 12, endHour: 17 },
-    { key: "evening", label: "Evening", startHour: 18, endHour: 21 },
-    { key: "night", label: "Night", startHour: 22, endHour: 5, wraps: true },
-  ];
+  { key: "morning", label: "Morning", startHour: 6, endHour: 11 },
+  { key: "afternoon", label: "Afternoon", startHour: 12, endHour: 17 },
+  { key: "evening", label: "Evening", startHour: 18, endHour: 21 },
+  { key: "night", label: "Night", startHour: 22, endHour: 5, wraps: true },
+];
 
 const DAY_NIGHT_SPLIT = { dayStart: 6, dayEnd: 18 }; // 06:00-17:59 day, otherwise night
 

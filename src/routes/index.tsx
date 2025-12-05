@@ -4,7 +4,7 @@ import { useAtomValue } from "jotai";
 import { useState, useMemo, useEffect, useRef } from "react";
 import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
-import { Moon, Sun, History as HistoryIcon } from "lucide-react";
+import { History as HistoryIcon } from "lucide-react";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { SleepModal } from "~/components/mobile/SleepModal";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
@@ -22,12 +22,15 @@ function Home() {
   const [modalOpen, setModalOpen] = useState(false);
   const [now, setNow] = useState(dayjs());
 
-  // Animation state tracking
-  const previousSleepingRef = useRef<boolean | null>(null);
-  const [animationState, setAnimationState] = useState<'awake-to-sleep' | 'sleep-to-awake' | null>(null);
-
   // Use the shared sleep history hook
   const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
+
+  // Track rotation angle - increment by 180deg each state change
+  // Initialize based on current state: 0 (awake/no data) or 180 (sleeping)
+  const [rotationDegrees, setRotationDegrees] = useState(() => {
+    return sleepState?.isActive ? 180 : 0;
+  });
+  const previousSleepingRef = useRef<boolean | null>(null);
 
   // Update 'now' every minute to refresh awake time display
   useEffect(() => {
@@ -38,30 +41,45 @@ function Home() {
     return () => clearInterval(interval);
   }, []);
 
-  // Detect sleep state transitions and trigger animations
+  // Increment rotation by 180deg on each state change
   useEffect(() => {
     const isSleeping = sleepState?.isActive || false;
 
     if (previousSleepingRef.current !== null && previousSleepingRef.current !== isSleeping) {
-      // State changed - trigger animation
-      if (isSleeping) {
-        // Was awake, now sleeping
-        setAnimationState("awake-to-sleep");
-      } else {
-        // Was sleeping, now awake
-        setAnimationState("sleep-to-awake");
-      }
-
-      // Clear animation state after animation completes
-      const timeout = setTimeout(() => {
-        setAnimationState(null);
-      }, 1000);
-
-      return () => clearTimeout(timeout);
+      // State changed - add 180 degrees
+      setRotationDegrees(prev => prev + 180);
     }
 
     previousSleepingRef.current = isSleeping;
   }, [sleepState?.isActive]);
+
+  // Check if yesterday's night sleep ended today (when no sleepState exists)
+  const yesterdayNightWake = useMemo(() => {
+    if (sleepState || !allStats || allStats.length === 0) {
+      return null;
+    }
+
+    // Get yesterday's stat (second to last, or last if only one exists)
+    const yesterdayStat = allStats[allStats.length - 1];
+    if (!yesterdayStat) {
+      return null;
+    }
+
+
+    // Check if the wake time is today
+    const awakeStart = yesterdayStat.endDatetime;
+    if (!awakeStart.isSame(now, "day")) {
+      return null;
+    }
+
+    // Compute awake duration
+    const awakeDuration = now.diff(awakeStart, "minutes");
+
+    return {
+      awakeStartTime: awakeStart.format("HH:mm"),
+      awakeDuration,
+    };
+  }, [sleepState, allStats, now]);
 
   // Calculate current awake duration in real-time
   const currentAwakeDuration = useMemo(() => {
@@ -81,10 +99,10 @@ function Home() {
     return Math.round((now.unix() - awakeStart.unix()) / 60);
   }, [sleepState, allStats, now]);
 
-  const todayStats = todayStat ? {
-    sleepMinutes: todayStat.totalSleepMinutes,
+  const todayStats = todayStat || yesterdayNightWake ? {
+    sleepMinutes: todayStat?.totalSleepMinutes ?? 0,
     // Include both past awake time and current awake duration
-    awakeMinutes: todayStat.awakeMinutes + currentAwakeDuration,
+    awakeMinutes: todayStat?.awakeMinutes ?? 0 + currentAwakeDuration + (todayStat ? 0 : yesterdayNightWake?.awakeDuration ?? 0),
   } : null;
 
   // Calculate historical averages for comparison (last 7 days excluding today)
@@ -159,68 +177,58 @@ function Home() {
       <Block strong inset>
         {/* <Card className="text-center py-1"> */}
         <div className="flex flex-col items-center gap-3">
-          {sleepState?.isActive ? (
+          {sleepState?.isActive || sleepState?.awakeStartTime || yesterdayNightWake || !sleepState ? (
             <>
-              <div className="relative w-20 h-20 flex items-center justify-center">
-                {animationState === "awake-to-sleep" ? (
-                  <>
-                    <div className="absolute text-5xl animate-sun-set">
-                      <Sun className="w-12 h-12" />
-                    </div>
-                    <div className="absolute text-5xl animate-moon-rise">
-                      😴
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-5xl">
+              {/* Orbit Animation Container */}
+              <div className="relative w-full h-20 flex items-center justify-center overflow-hidden">
+                <div
+                  className="absolute w-32 h-32 top-8 orbit-container"
+                  style={{ transform: `rotate(${rotationDegrees}deg)` }}
+                >
+                  {/* Sun at top of orbit */}
+                  <div
+                    className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl icon-container"
+                    style={{ transform: `rotate(${-rotationDegrees}deg)` }}
+                  >
+                    ☀️
+                  </div>
+                  {/* Moon at bottom of orbit */}
+                  <div
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 text-5xl icon-container"
+                    style={{ transform: `rotate(${-rotationDegrees}deg)` }}
+                  >
                     😴
                   </div>
-                )}
+                </div>
+                {/* Bottom blur overlay for fade-out effect */}
+                <div
+                  className="absolute bottom-0 left-0 right-0 h-3 pointer-events-none"
+                  style={{
+                    backdropFilter: "blur(4px)",
+                    WebkitBackdropFilter: "blur(4px)",
+                  }}
+                />
               </div>
               <div className="text-xl font-semibold">
-                {displayName} is Sleeping
+                {sleepState?.isActive ? `${displayName} is Sleeping` :
+                  sleepState?.awakeStartTime || yesterdayNightWake ? `${displayName} is Awake` :
+                    allStats?.length === 0 ? "No sleep data yet" : "Today no sleep data yet"}
               </div>
-              <div className="text-lg opacity-70">
-                since {sleepState.startTime} ({formatDuration(sleepState.duration)})
-              </div>
+              {sleepState && (
+                <div className="text-lg opacity-70">
+                  since {sleepState?.isActive ? sleepState.startTime : sleepState.awakeStartTime} ({formatDuration(sleepState?.isActive ? sleepState.duration : sleepState.awakeDuration)})
+                </div>
+              )}
+              {yesterdayNightWake && (
+                <div className="text-lg opacity-70">
+                  since {yesterdayNightWake.awakeStartTime} ({formatDuration(yesterdayNightWake.awakeDuration)})
+                </div>
+              )}
+              {!sleepState && !yesterdayNightWake && (
+                <div className="text-sm opacity-70">Start tracking below</div>
+              )}
             </>
-          ) : sleepState?.awakeStartTime ? (
-            <>
-              <div className="relative w-20 h-20 flex items-center justify-center">
-                {animationState === "sleep-to-awake" ? (
-                  <>
-                    <div className="absolute text-5xl animate-moon-set">
-                      😴
-                    </div>
-                    <div className="absolute text-5xl animate-sun-rise">
-                      <Sun className="w-12 h-12" />
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-5xl">
-                    <Sun className="w-12 h-12" />
-                  </div>
-                )}
-              </div>
-              <div className="text-xl font-semibold">
-                {displayName} is Awake
-              </div>
-              <div className="text-lg opacity-70">
-                since {sleepState.awakeStartTime} ({formatDuration(sleepState.awakeDuration)})
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="text-5xl">
-                <Moon className="w-16 h-16 opacity-30" />
-              </div>
-              {allStats?.length == 0 ?
-                <div className="text-xl font-semibold">No sleep data yet</div>
-                : <div className="text-xl font-semibold">Today no sleep data yet</div>}
-
-              <div className="text-sm opacity-70">Start tracking below</div>
-            </>
-          )}
+          ) : null}
         </div>
         <Button
           large

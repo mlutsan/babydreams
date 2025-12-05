@@ -42,89 +42,89 @@
       source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
   }
 
-  /* Sleep state transition animations */
-  @keyframes sunSet {
-    0% {
-      transform: translate(0, 0) scale(1);
-      opacity: 1;
+  /* Sleep state transition animations - Circular orbit approach */
+
+  /* Awake → Sleep: Orbit rotates clockwise 180deg (sun sets right, moon rises left) */
+  @keyframes orbitToSleep {
+    from {
+      transform: rotate(0deg);
     }
-    50% {
-      transform: translate(60px, 30px) scale(0.8);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translate(100px, 80px) scale(0.5);
-      opacity: 0;
+
+    to {
+      transform: rotate(180deg);
     }
   }
 
-  @keyframes moonRise {
-    0% {
-      transform: translate(100px, 80px) scale(0.5);
-      opacity: 0;
+  /* Sleep → Awake: Orbit rotates clockwise 180deg (moon sets left, sun rises right) */
+  @keyframes orbitToAwake {
+    from {
+      transform: rotate(180deg);
     }
-    50% {
-      transform: translate(60px, 30px) scale(0.8);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translate(0, 0) scale(1);
-      opacity: 1;
+
+    to {
+      transform: rotate(360deg);
     }
   }
 
-  @keyframes sunRise {
-    0% {
-      transform: translate(-100px, 80px) scale(0.5);
-      opacity: 0;
-    }
-    50% {
-      transform: translate(-60px, 30px) scale(0.8);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translate(0, 0) scale(1);
-      opacity: 1;
-    }
+  .orbit-container {
+    transition: transform 1000ms cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 
-  @keyframes moonSet {
-    0% {
-      transform: translate(0, 0) scale(1);
-      opacity: 1;
+  .orbit-awake {
+    transform: rotate(0deg);
+  }
+
+  .orbit-awake-from-sleep {
+    transform: rotate(360deg);
+  }
+
+  .orbit-sleeping {
+    transform: rotate(180deg);
+  }
+
+  /* Counter-rotate icons so they stay upright during orbit rotation */
+  @keyframes counterRotateToSleep {
+    from {
+      transform: rotate(0deg);
     }
-    50% {
-      transform: translate(-60px, 30px) scale(0.8);
-      opacity: 0.5;
-    }
-    100% {
-      transform: translate(-100px, 80px) scale(0.5);
-      opacity: 0;
+
+    to {
+      transform: rotate(-180deg);
     }
   }
 
-  .animate-sun-set {
-    animation: sunSet 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  @keyframes counterRotateToAwake {
+    from {
+      transform: rotate(-180deg);
+    }
+
+    to {
+      transform: rotate(-360deg);
+    }
   }
 
-  .animate-moon-rise {
-    animation: moonRise 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  .icon-container {
+    transition: transform 1000ms cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 
-  .animate-sun-rise {
-    animation: sunRise 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  .icon-awake {
+    transform: rotate(0deg);
   }
 
-  .animate-moon-set {
-    animation: moonSet 1000ms cubic-bezier(0.4, 0.0, 0.2, 1) forwards;
+  .icon-awake-from-sleep {
+    transform: rotate(-360deg);
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .animate-sun-set,
-    .animate-moon-rise,
-    .animate-sun-rise,
-    .animate-moon-set {
+  .icon-sleeping {
+    transform: rotate(-180deg);
+  }
+
+  /* @media (prefers-reduced-motion: reduce) {
+    .animate-orbit-to-sleep,
+    .animate-orbit-to-awake,
+    .animate-icon-counter-rotate-sleep,
+    .animate-icon-counter-rotate-awake {
       animation: none;
     }
-  }
+  } */
 }

@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { sheetUrlAtom, babyNameAtom, cycleSettingsAtom } from "~/lib/atoms";
+import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { getEatHistory } from "~/lib/eat-service";
 import { EatModal } from "~/components/mobile/EatModal";
