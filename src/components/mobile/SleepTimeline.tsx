@@ -35,6 +35,8 @@ interface DailySleepBar {
   type: "daily";
   date: dayjs.Dayjs;
   totalMinutes: number;
+  dayMinutes: number;
+  nightMinutes: number;
   sessionCount: number;
 }
 
@@ -54,7 +56,7 @@ export function ResponsiveSleepTimeline({
   allDayStats,
   height = TIMELINE_HEIGHT + BAR_CHART_HEIGHT + GAP_BETWEEN_SECTIONS + 50, // margin top + bottom
 }: ResponsiveSleepTimelineProps) {
-  const margin = { top: 40, right: 50, bottom: 10, left: 50 };
+  const margin = { top: 40, right: 50, bottom: 40, left: 50 };
   const innerHeight = TIMELINE_HEIGHT;
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
@@ -173,11 +175,13 @@ export function ResponsiveSleepTimeline({
       : "#003ea1"; // darker blue for night sleep
   };
 
-  // Calculate daily total sleep in minutes for bar chart
+  // Calculate daily total sleep in minutes for bar chart (split by day/night)
   const dailyTotals = useMemo(() => {
     return allDayStats.map((dayStat) => ({
       date: dayjs(dayStat.logicalDate),
       totalMinutes: dayStat.totalSleepMinutes,
+      dayMinutes: dayStat.daySleepMinutes,
+      nightMinutes: dayStat.nightSleepMinutes,
     }));
   }, [allDayStats]);
 
@@ -248,13 +252,15 @@ export function ResponsiveSleepTimeline({
 
     const eventSvgCoords = localPoint(event);
     const left = barX + columnWidth / 2;
-    const top = (eventSvgCoords?.y || 0) - 80;
+    const top = (eventSvgCoords?.y || 0) - 100;
 
     showTooltip({
       tooltipData: {
         type: "daily",
         date: dayjs(dayStat.logicalDate),
         totalMinutes: dayStat.totalSleepMinutes,
+        dayMinutes: dayStat.daySleepMinutes,
+        nightMinutes: dayStat.nightSleepMinutes,
         sessionCount: dayStat.sessionCount,
       },
       tooltipTop: top,
@@ -472,38 +478,92 @@ export function ResponsiveSleepTimeline({
               );
             })}
 
-            {/* Daily total sleep bars */}
+            {/* Daily total sleep bars (stacked: night on bottom, day on top) */}
             {dailyTotals.map((dayTotal, dayIndex) => {
               const x = dayScale(dayIndex.toString()) || 0;
-              const barHeight = Math.max(2, BAR_CHART_HEIGHT - barSleepScale(dayTotal.totalMinutes));
-              const barY = BAR_CHART_HEIGHT - barHeight;
               const dayStat = allDayStats[dayIndex];
 
+              // Calculate heights for stacked bars
+              const nightHeight = BAR_CHART_HEIGHT - barSleepScale(dayTotal.nightMinutes);
+              const dayHeight = BAR_CHART_HEIGHT - barSleepScale(dayTotal.dayMinutes);
+
+              // Night bar on bottom
+              const nightY = BAR_CHART_HEIGHT - nightHeight;
+              // Day bar stacked on top of night
+              const dayY = nightY - dayHeight;
+
               return (
-                <g key={`bar-group-${dayIndex}`}>
-                  <Bar
-                    x={x}
-                    y={barY}
-                    width={columnWidth}
-                    height={barHeight}
-                    fill="#60a5fa"
-                    rx={2}
-                    onMouseMove={(event) => handleTotalBarInteraction(event, dayStat, x)}
-                    onMouseLeave={handleTotalBarLeave}
-                    style={{ cursor: "pointer" }}
-                  />
-                  {/* Sleep duration label inside bar */}
-                  {barHeight > 40 && (
-                    <Text
-                      x={x + columnWidth / 2}
-                      y={barY + barHeight - 5}
-                      fontSize={10}
-                      fontWeight="600"
+                <g
+                  key={`bar-group-${dayIndex}`}
+                  onMouseMove={(event) => handleTotalBarInteraction(event, dayStat, x)}
+                  onMouseLeave={handleTotalBarLeave}
+                  style={{ cursor: "pointer" }}
+                >
+                  {/* Night sleep bar (bottom, darker) */}
+                  {nightHeight > 0 && (
+                    <Bar
+                      x={x}
+                      y={nightY}
+                      width={columnWidth}
+                      height={nightHeight}
                       fill="#1e3a8a"
-                      textAnchor="middle"
-                    >
-                      {formatDurationHHMM(dayTotal.totalMinutes)}
-                    </Text>
+                      rx={dayHeight > 0 ? 0 : 2}
+                      ry={dayHeight > 0 ? 0 : 2}
+                    />
+                  )}
+                  {/* Day sleep bar (top, lighter) */}
+                  {dayHeight > 0 && (
+                    <Bar
+                      x={x}
+                      y={dayY}
+                      width={columnWidth}
+                      height={dayHeight}
+                      fill="#93c5fd"
+                      rx={2}
+                      ry={2}
+                    />
+                  )}
+                  {/* Round bottom corners of night bar */}
+                  {nightHeight > 0 && (
+                    <rect
+                      x={x}
+                      y={BAR_CHART_HEIGHT - Math.min(4, nightHeight)}
+                      width={columnWidth}
+                      height={Math.min(4, nightHeight)}
+                      fill="#1e3a8a"
+                      rx={2}
+                      ry={2}
+                    />
+                  )}
+                  {/* Labels at bottom of bar, side by side */}
+                  {(dayHeight > 0 || nightHeight > 0) && (
+                    <>
+                      {/* Day label on left */}
+                      {(
+                        <Text
+                          x={x + columnWidth / 2}
+                          //y={BAR_CHART_HEIGHT - 20}
+                          y={BAR_CHART_HEIGHT - 20}
+                          fontSize={10}
+                          fill="white"
+                          textAnchor="middle"
+                        >
+                          {`☀️ ${formatDurationHHMM(dayTotal.dayMinutes ?? 0)}`}
+                        </Text>
+                      )}
+                      {/* Night label on right */}
+                      {(
+                        <Text
+                          x={x + columnWidth / 2}
+                          y={BAR_CHART_HEIGHT - 5}
+                          fontSize={10}
+                          fill="white"
+                          textAnchor="middle"
+                        >
+                          {`🌙 ${formatDurationHHMM(dayTotal.nightMinutes ?? 0)}`}
+                        </Text>
+                      )}
+                    </>
                   )}
                 </g>
               );
@@ -557,10 +617,13 @@ export function ResponsiveSleepTimeline({
                 {tooltipData.date.format("MMM D, YYYY")}
               </div>
               <div className="text-gray-700 dark:text-gray-300">
-                Total: {formatDurationHHMM(tooltipData.totalMinutes)}
+                Day: {formatDurationHHMM(tooltipData.dayMinutes)}
               </div>
-              <div className="text-gray-600 dark:text-gray-400">
-                {tooltipData.sessionCount} session{tooltipData.sessionCount !== 1 ? "s" : ""}
+              <div className="text-gray-700 dark:text-gray-300">
+                Night: {formatDurationHHMM(tooltipData.nightMinutes)}
+              </div>
+              <div className="text-gray-700 dark:text-gray-300 font-semibold">
+                Total: {formatDurationHHMM(tooltipData.totalMinutes)}
               </div>
             </div>
           ) : (
