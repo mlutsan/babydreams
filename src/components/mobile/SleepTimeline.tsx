@@ -188,19 +188,16 @@ export function ResponsiveSleepTimeline({
     range: [BAR_CHART_HEIGHT, 0],
   });
 
-  // Current time indicator position (if today is visible)
+  // Today index for highlighting
   const todayIndex = allDayStats.findIndex((stat) => {
     return dayjs(stat.logicalDate).isSame(dayjs(), "day");
   });
 
-  const showCurrentTimeIndicator = todayIndex !== -1;
-  let currentTimeY = 0;
-
-  if (showCurrentTimeIndicator) {
-    const now = dayjs();
-    const currentTimeOfDay = now.hour() * 60 + now.minute();
-    currentTimeY = yScale(currentTimeOfDay);
-  }
+  // Current time indicator - always show
+  const now = dayjs();
+  const currentTimeSimple = now.hour() * 60 + now.minute();
+  const currentTimeY = yScale(currentTimeSimple);
+  const showCurrentTimeIndicator = currentTimeY >= 0 && currentTimeY <= innerHeight;
 
   // Handle tooltip show/hide
   const handleBarInteraction = (

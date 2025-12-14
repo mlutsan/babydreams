@@ -195,19 +195,36 @@ export function EatOverviewChart({
     range: [BAR_CHART_HEIGHT, 0],
   });
 
-  // Current time indicator
+  // Current time indicator - always show
+  const now = dayjs();
+  const currentTimeSimple = now.hour() * 60 + now.minute();
+  const currentTimeY = timeScale(currentTimeSimple);
+  const showCurrentTimeIndicator = currentTimeY >= 0 && currentTimeY <= TIMELINE_HEIGHT;
+
+  // Today index for highlighting
   const todayIndex = sortedDailyStats.findIndex((stat) =>
     dayjs(stat.date).isSame(dayjs(), "day")
   );
 
-  const showCurrentTimeIndicator = todayIndex !== -1;
-  let currentTimeY = 0;
+  // Calculate cumulative volume eaten by current time for each day
+  const volumeByCurrentTime = useMemo(() => {
+    const result: Map<number, number> = new Map();
 
-  if (showCurrentTimeIndicator) {
-    const now = dayjs();
-    const currentTimeMinutes = now.hour() * 60 + now.minute();
-    currentTimeY = timeScale(currentTimeMinutes);
-  }
+    sortedDailyStats.forEach((dayStat, dayIndex) => {
+      let cumulativeVolume = 0;
+
+      dayStat.entries.forEach((entry) => {
+        const entryTimeMinutes = entry.datetime.hour() * 60 + entry.datetime.minute();
+        if (entryTimeMinutes <= currentTimeSimple) {
+          cumulativeVolume += entry.volume;
+        }
+      });
+
+      result.set(dayIndex, cumulativeVolume);
+    });
+
+    return result;
+  }, [sortedDailyStats, currentTimeSimple]);
 
   // Handle tooltip
   const handleCircleInteraction = (
@@ -428,14 +445,51 @@ export function EatOverviewChart({
               );
             })}
 
-            {/* Current time indicator */}
-            {showCurrentTimeIndicator && currentTimeY >= 0 && currentTimeY <= TIMELINE_HEIGHT && (
-              <Line
-                from={{ x: 0, y: currentTimeY }}
-                to={{ x: innerWidth, y: currentTimeY }}
-                stroke="#ef4444"
-                strokeWidth={2}
-              />
+            {/* Current time indicator with volume labels */}
+            {showCurrentTimeIndicator && (
+              <>
+                <Line
+                  from={{ x: 0, y: currentTimeY }}
+                  to={{ x: innerWidth, y: currentTimeY }}
+                  stroke="#ef4444"
+                  strokeWidth={2}
+                />
+                {/* Volume labels above the line for each day */}
+                {sortedDailyStats.map((_, dayIndex) => {
+                  const x = dayScale(dayIndex.toString()) || 0;
+                  const volume = volumeByCurrentTime.get(dayIndex) || 0;
+                  if (volume === 0) {
+                    return null;
+                  }
+                  const labelX = x + columnWidth / 2;
+                  const labelY = currentTimeY - 6;
+                  const labelWidth = String(volume).length * 7 + 6;
+                  return (
+                    <g key={`time-label-${dayIndex}`}>
+                      {/* Background pill */}
+                      <rect
+                        x={labelX - labelWidth / 2}
+                        y={labelY - 10}
+                        width={labelWidth}
+                        height={14}
+                        rx={4}
+                        fill="black"
+                        fillOpacity={0.55}
+                      />
+                      <Text
+                        x={labelX}
+                        y={labelY}
+                        fontSize={10}
+                        fontWeight="600"
+                        fill="darkgrey"
+                        textAnchor="middle"
+                      >
+                        {volume}
+                      </Text>
+                    </g>
+                  );
+                })}
+              </>
             )}
           </Group>
 
