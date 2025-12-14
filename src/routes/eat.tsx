@@ -8,7 +8,6 @@ import { getEatHistory } from "~/lib/eat-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
 import { EatStats } from "~/components/mobile/EatStats";
-import { useEatMutation } from "~/hooks/useEatMutation";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { Milk } from "lucide-react";
 import dayjs from "dayjs";
@@ -74,24 +73,6 @@ function Eat() {
     return today || null;
   }, [allStats, todaySleepStat]);
 
-  // Use the reusable eat mutation hook
-  const addMutation = useEatMutation();
-
-  // Determine current cycle date from sleep stats
-  const currentCycleDate = useMemo(() => {
-    if (todaySleepStat) {
-      // Use the cycle date from today's sleep stat
-      return todaySleepStat.startDatetime;
-    }
-
-    // Only fallback once sleep data has settled
-    if (isSleepFetched) {
-      return dayjs();
-    }
-
-    return null;
-  }, [todaySleepStat, isSleepFetched]);
-
   // Calculate time since last meal in HH:mm format (must be before any returns)
   const lastMeal = todayStat?.entries[todayStat.entries.length - 1];
   const timeSinceLastMeal = useMemo(() => {
@@ -105,26 +86,6 @@ function Eat() {
 
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
   }, [lastMeal, now]);
-
-  const handleAddMeal = (volume: number, time: string) => {
-    if (!sheetUrl || !currentCycleDate) {
-      return;
-    }
-
-    addMutation.mutate(
-      {
-        sheetUrl,
-        volume,
-        cycleDate: currentCycleDate,
-        time,
-      },
-      {
-        onSuccess: () => {
-          setModalOpen(false);
-        },
-      }
-    );
-  };
 
   // Show loading while atoms hydrate from storage
   if (!isHydrated) {
@@ -217,14 +178,10 @@ function Eat() {
           large
           rounded
           onClick={() => setModalOpen(true)}
-          disabled={addMutation.isPending || !currentCycleDate}
+          disabled={!isSleepFetched}
           className="w-full bg-amber-500 active:bg-amber-600 mt-4"
         >
-          {addMutation.isPending
-            ? "Nom nom nom..."
-            : !currentCycleDate
-              ? "Loading sleep data..."
-              : "Add Meal"}
+          {!isSleepFetched ? "Loading..." : "Add Meal"}
         </Button>
       </Block>
 
@@ -248,8 +205,6 @@ function Eat() {
       <EatModal
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
-        onConfirm={handleAddMeal}
-        isLoading={addMutation.isPending}
       />
     </>
   );

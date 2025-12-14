@@ -4,17 +4,16 @@ import { useToast } from "~/hooks/useToast";
 
 /**
  * Reusable hook for eating/meal tracking mutations
- * Handles success/error toasts and cache invalidation
+ * Handles cache invalidation and error feedback
  */
 export function useEatMutation() {
   const queryClient = useQueryClient();
-  const { success, error } = useToast();
+  const { error } = useToast();
 
   return useMutation({
     mutationFn: addEatEntry,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["eatHistory"] });
-      success("Meal recorded successfully!");
     },
     onError: (err) => {
       error("Failed to record meal", {

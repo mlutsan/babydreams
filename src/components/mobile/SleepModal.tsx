@@ -12,26 +12,27 @@ import {
 } from "konsta/react";
 import { X, Edit2 } from "lucide-react";
 import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
-import { babyNameAtom, cycleSettingsAtom, calculateCycleFromTime } from "~/lib/atoms";
+import { babyNameAtom, sheetUrlAtom, cycleSettingsAtom, calculateCycleFromTime } from "~/lib/atoms";
+import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useSleepMutation } from "~/hooks/useSleepMutation";
 import dayjs from "dayjs";
 
 interface SleepModalProps {
   opened: boolean;
   onClose: () => void;
   isSleeping: boolean; // Is baby currently sleeping?
-  onConfirm: (time: string, cycle: "Day" | "Night") => void;
-  isLoading?: boolean; // Is data being saved?
 }
 
 export function SleepModal({
   opened,
   onClose,
   isSleeping,
-  onConfirm,
-  isLoading = false,
 }: SleepModalProps) {
   const babyName = useAtomValue(babyNameAtom);
+  const sheetUrl = useAtomValue(sheetUrlAtom);
   const cycleSettings = useAtomValue(cycleSettingsAtom);
+  const { todayStat } = useTodaySleepStat();
+  const mutation = useSleepMutation();
 
   const [selectedTime, setSelectedTime] = useState("");
   const [cycle, setCycle] = useState<"Day" | "Night">("Day");
@@ -67,10 +68,22 @@ export function SleepModal({
   }, [selectedTime, cycleSettings]);
 
   const handleConfirm = () => {
-    if (!selectedTime) {
+    if (!selectedTime || !sheetUrl) {
       return;
     }
-    onConfirm(selectedTime, cycle);
+
+    mutation.mutate(
+      {
+        sheetUrl,
+        time: selectedTime,
+        cycle,
+        what: isSleeping ? "Awake" : "Sleep",
+        todayStat: todayStat || null,
+      },
+      {
+        onSuccess: onClose,
+      }
+    );
   };
 
   // Calculate relative time for display only
@@ -207,8 +220,8 @@ export function SleepModal({
 
           {/* Confirm Button */}
           <div className="mt-8">
-            <Button large rounded onClick={handleConfirm} disabled={isLoading}>
-              {isLoading ? "Saving..." : "Confirm"}
+            <Button large rounded onClick={handleConfirm} disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving..." : "Confirm"}
             </Button>
           </div>
         </div>

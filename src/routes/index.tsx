@@ -9,7 +9,6 @@ import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { SleepModal } from "~/components/mobile/SleepModal";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
-import { useSleepMutation } from "~/hooks/useSleepMutation";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/")({
@@ -44,12 +43,10 @@ function Home() {
   // Increment rotation by 180deg on each state change
   useEffect(() => {
     const isSleeping = sleepState?.isActive || false;
-
     if (previousSleepingRef.current !== null && previousSleepingRef.current !== isSleeping) {
       // State changed - add 180 degrees
       setRotationDegrees(prev => prev + 180);
     }
-
     previousSleepingRef.current = isSleeping;
   }, [sleepState?.isActive]);
 
@@ -58,14 +55,11 @@ function Home() {
     if (sleepState || !allStats || allStats.length === 0) {
       return null;
     }
-
     // Get yesterday's stat (second to last, or last if only one exists)
     const yesterdayStat = allStats[allStats.length - 1];
     if (!yesterdayStat) {
       return null;
     }
-
-
     // Check if the wake time is today
     const awakeStart = yesterdayStat.endDatetime;
     if (!awakeStart.isSame(now, "day")) {
@@ -74,7 +68,6 @@ function Home() {
 
     // Compute awake duration
     const awakeDuration = now.diff(awakeStart, "minutes");
-
     return {
       awakeStartTime: awakeStart.format("HH:mm"),
       awakeDuration,
@@ -95,14 +88,15 @@ function Home() {
       return 0;
     }
 
-    const awakeStart = lastEntry.date.startOf("day").add(lastEntry.endTime);
-    return Math.round((now.unix() - awakeStart.unix()) / 60);
+    const awakeStartDateTime = lastEntry.realDatetime.startOf("day").add(lastEntry.endTime);
+    const diff = now.diff(awakeStartDateTime, "minutes");
+    return diff;
   }, [sleepState, allStats, now]);
 
   const todayStats = todayStat || yesterdayNightWake ? {
     sleepMinutes: todayStat?.totalSleepMinutes ?? 0,
     // Include both past awake time and current awake duration
-    awakeMinutes: todayStat?.awakeMinutes ?? 0 + currentAwakeDuration + (todayStat ? 0 : yesterdayNightWake?.awakeDuration ?? 0),
+    awakeMinutes: (todayStat?.awakeMinutes ?? 0) + currentAwakeDuration + (todayStat ? 0 : yesterdayNightWake?.awakeDuration ?? 0),
   } : null;
 
   // Calculate historical averages for comparison (last 7 days excluding today)
@@ -126,9 +120,6 @@ function Home() {
     return { avgSleep, avgSessions };
   }, [allStats]);
 
-  // Use the reusable sleep mutation hook
-  const trackMutation = useSleepMutation();
-
   // Check if sheet URL is configured
   if (!sheetUrl) {
     return (
@@ -140,27 +131,6 @@ function Home() {
   }
 
   const isSleeping = sleepState?.isActive || false;
-
-  const handleTrackSleep = (time: string, cycle: "Day" | "Night") => {
-    if (!sheetUrl) {
-      return;
-    }
-
-    trackMutation.mutate(
-      {
-        sheetUrl,
-        time,
-        cycle,
-        what: isSleeping ? "Awake" : "Sleep",
-        todayStat: todayStat || null,
-      },
-      {
-        onSuccess: () => {
-          setModalOpen(false);
-        },
-      }
-    );
-  };
   const displayName = babyName || "Baby";
 
   if (isLoading) {
@@ -234,14 +204,9 @@ function Home() {
           large
           rounded
           onClick={() => setModalOpen(true)}
-          disabled={trackMutation.isPending}
           className="w-full mt-4"
         >
-          {trackMutation.isPending
-            ? "Tracking..."
-            : isSleeping
-              ? "Woke up"
-              : "Fall asleep"}
+          {isSleeping ? "Woke up" : "Fall asleep"}
         </Button>
         {/* </Card> */}
       </Block>
@@ -288,8 +253,7 @@ function Home() {
                       ? "text-orange-600"
                       : todayStat.sessionCount < historicalAvg.avgSessions
                         ? "text-green-600"
-                        : "text-gray-500"
-                      }`}>
+                        : "text-gray-500"}`}>
                       {todayStat.sessionCount > historicalAvg.avgSessions
                         ? "↑"
                         : todayStat.sessionCount < historicalAvg.avgSessions
@@ -359,8 +323,6 @@ function Home() {
         opened={modalOpen}
         onClose={() => setModalOpen(false)}
         isSleeping={isSleeping}
-        onConfirm={handleTrackSleep}
-        isLoading={trackMutation.isPending}
       />
     </>
   );

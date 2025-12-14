@@ -4,17 +4,16 @@ import { useToast } from "~/hooks/useToast";
 
 /**
  * Reusable hook for sleep tracking mutations
- * Handles success/error toasts and cache invalidation
+ * Handles cache invalidation and error feedback
  */
 export function useSleepMutation() {
   const queryClient = useQueryClient();
-  const { success, error } = useToast();
+  const { error } = useToast();
 
   return useMutation({
     mutationFn: addSleepEntry,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["history"] });
-      success("Sleep tracked successfully!");
     },
     onError: (err) => {
       error("Failed to track sleep", {

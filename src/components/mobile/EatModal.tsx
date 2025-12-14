@@ -1,25 +1,31 @@
 /**
  * Modal for adding a meal entry
- * Shows volume slider (0-200ml)
+ * Self-contained: handles mutation internally
  */
 
 import { useState, useEffect, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link } from "konsta/react";
 import { X } from "lucide-react";
-import { babyNameAtom } from "~/lib/atoms";
+import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
+import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useEatMutation } from "~/hooks/useEatMutation";
 import dayjs from "dayjs";
 import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
 
 interface EatModalProps {
   opened: boolean;
   onClose: () => void;
-  onConfirm: (volume: number, time: string) => void;
-  isLoading?: boolean; // Is data being saved?
 }
 
-export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatModalProps) {
+export function EatModal({ opened, onClose }: EatModalProps) {
   const babyName = useAtomValue(babyNameAtom);
+  const sheetUrl = useAtomValue(sheetUrlAtom);
+  const { todayStat, isFetched } = useTodaySleepStat();
+  const mutation = useEatMutation();
+
+  // Determine current cycle date from sleep stats
+  const currentCycleDate = todayStat?.startDatetime ?? (isFetched ? dayjs() : null);
   const [volume, setVolume] = useState(100); // Default 100ml
   const [selectedTime, setSelectedTime] = useState("");
   const timeInputRef = useRef<HTMLInputElement>(null);
@@ -65,10 +71,31 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
   };
 
   const handleConfirm = () => {
-    if (!selectedTime) {
+    if (!selectedTime || !sheetUrl || !currentCycleDate) {
       return;
     }
-    onConfirm(volume, selectedTime);
+
+    const [hours, minutes] = selectedTime.split(":").map(Number);
+    let datetime = dayjs().hour(hours).minute(minutes).second(0);
+
+    // Tracking is always about the past.
+    // If computed datetime is significantly in the future (>60 min grace), it must be yesterday.
+    // Example: now is 00:05, user enters 23:55 → should be yesterday at 23:55
+    if (datetime.isAfter(dayjs().add(60, "minute"))) {
+      datetime = datetime.subtract(1, "day");
+    }
+
+    mutation.mutate(
+      {
+        sheetUrl,
+        volume,
+        datetime,
+        cycleDate: currentCycleDate,
+      },
+      {
+        onSuccess: onClose,
+      }
+    );
   };
 
   const handleTimeAdjustment = (minutes: number) => {
@@ -174,10 +201,10 @@ export function EatModal({ opened, onClose, onConfirm, isLoading = false }: EatM
               large
               rounded
               onClick={handleConfirm}
-              disabled={isLoading}
+              disabled={mutation.isPending || !currentCycleDate}
               className="bg-amber-500 active:bg-amber-600"
             >
-              {isLoading ? "Om-nom-noming..." : "Confirm"}
+              {mutation.isPending ? "Om-nom-noming..." : "Confirm"}
             </Button>
           </div>
         </div>
