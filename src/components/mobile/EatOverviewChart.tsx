@@ -214,7 +214,9 @@ export function EatOverviewChart({
       let cumulativeVolume = 0;
 
       dayStat.entries.forEach((entry) => {
-        const entryTimeMinutes = entry.datetime.hour() * 60 + entry.datetime.minute();
+        const dayOffset = entry.datetime.startOf("day").diff(entry.cycleDate.startOf("day"), "days") * 24 * 60;
+
+        const entryTimeMinutes = dayOffset + entry.datetime.hour() * 60 + entry.datetime.minute();
         if (entryTimeMinutes <= currentTimeSimple) {
           cumulativeVolume += entry.volume;
         }
