@@ -17,6 +17,8 @@ import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 import type { DailyStat } from "~/types/sleep";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
+import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { useCurrentTimeMinutes } from "~/hooks/useCurrentTimeMinutes";
 
 interface SleepBar {
   id: string;
@@ -103,8 +105,17 @@ export function ResponsiveSleepTimeline({
         const sleepStart = entry.realDatetime;
 
         let sleepEnd: dayjs.Dayjs;
+        let durationMinutes = 0;
+        let isActive = false;
+
         if (entry.endTime === null) {
-          sleepEnd = now;
+          const resolved = resolveActiveSleepEnd({
+            startDatetime: sleepStart,
+            now,
+          });
+          sleepEnd = resolved.endDatetime;
+          durationMinutes = resolved.durationMinutes;
+          isActive = resolved.isActive;
         } else {
           sleepEnd = entry.realDatetime.startOf("day").add(entry.endTime);
           const startMinutes = Math.floor(entry.startTime.asMinutes());
@@ -112,9 +123,8 @@ export function ResponsiveSleepTimeline({
           if (endMinutes < startMinutes) {
             sleepEnd = sleepEnd.add(1, "day");
           }
+          durationMinutes = sleepEnd.diff(sleepStart, "minutes");
         }
-
-        const durationMinutes = sleepEnd.diff(sleepStart, "minutes");
 
         const hoursStart = sleepStart.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;
         const hoursEnd = sleepEnd.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;
@@ -130,9 +140,9 @@ export function ResponsiveSleepTimeline({
           endMinutes: endTimeOfDay,
           cycle: entry.cycle,
           durationMinutes,
-          isActive: entry.endTime === null,
+          isActive,
           startTime: sleepStart.format("HH:mm"),
-          endTime: entry.endTime === null ? "Now" : sleepEnd.format("HH:mm"),
+          endTime: isActive ? "Now" : sleepEnd.format("HH:mm"),
         });
       });
     });
@@ -198,9 +208,8 @@ export function ResponsiveSleepTimeline({
   });
 
   // Current time indicator - always show
-  const now = dayjs();
-  const currentTimeSimple = now.hour() * 60 + now.minute();
-  const currentTimeY = yScale(currentTimeSimple);
+  const { currentTimeMinutes } = useCurrentTimeMinutes(allDayStats);
+  const currentTimeY = yScale(currentTimeMinutes);
   const showCurrentTimeIndicator = currentTimeY >= 0 && currentTimeY <= innerHeight;
 
   // Handle tooltip show/hide

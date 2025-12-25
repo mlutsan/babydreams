@@ -5,11 +5,31 @@
 
 import dayjs from "dayjs";
 import { getTimestamp, calculateDateForCycle } from "~/lib/date-utils";
-import { getSheetValues, appendSheetValues, updateSheetValues } from "~/server/proxy";
+import { getSheetValues, appendSheetValues, updateSheetValues, deleteSheetRow } from "~/server/proxy";
 import { DailyStat } from "~/types/sleep";
 
 const SLEEP_SHEET = "Sleep";
 const HEADERS = ["Added Date", "Date", "Start Time", "End Time", "Cycle", "Length"] as const;
+
+async function ensureSleepHeaders(sheetUrl: string) {
+  const range = `${SLEEP_SHEET}!A:F`;
+  const result = (await getSheetValues({ data: { sheetUrl, range } })) as {
+    values?: unknown[][];
+  };
+  const rows = (result.values as unknown[][]) || [];
+
+  if (rows.length === 0 || rows[0]?.[0] !== HEADERS[0]) {
+    await updateSheetValues({
+      data: {
+        sheetUrl,
+        range: `${SLEEP_SHEET}!A1:F1`,
+        values: [
+          [HEADERS[0], HEADERS[1], HEADERS[2], HEADERS[3], HEADERS[4], HEADERS[5]],
+        ],
+      },
+    });
+  }
+}
 
 /**
  * Start or end sleep tracking
@@ -72,22 +92,7 @@ export async function toggleSleep(params: {
       }
 
       // Ensure headers exist
-      const result = (await getSheetValues({ data: { sheetUrl, range } })) as {
-        values?: unknown[][];
-      };
-      const rows = (result.values as unknown[][]) || [];
-
-      if (rows.length === 0 || rows[0]?.[0] !== HEADERS[0]) {
-        await updateSheetValues({
-          data: {
-            sheetUrl,
-            range: `${SLEEP_SHEET}!A1:F1`,
-            values: [
-              [HEADERS[0], HEADERS[1], HEADERS[2], HEADERS[3], HEADERS[4], HEADERS[5]],
-            ],
-          },
-        });
-      }
+      await ensureSleepHeaders(sheetUrl);
 
       // Use last entry date from todayStat if available, otherwise use today
       const lastDate = todayStat?.entries.length
@@ -125,3 +130,74 @@ export async function toggleSleep(params: {
 
 // Keep old function name for backward compatibility during migration
 export const addSleepEntry = toggleSleep;
+
+export async function addSleepEntryManual(params: {
+  sheetUrl: string;
+  date: dayjs.Dayjs;
+  startTime: string;
+  endTime?: string;
+  cycle: "Day" | "Night";
+}): Promise<void> {
+  const { sheetUrl, date, startTime, endTime, cycle } = params;
+  const range = `${SLEEP_SHEET}!A:F`;
+
+  await ensureSleepHeaders(sheetUrl);
+
+  const newEntry = [
+    getTimestamp(),
+    date.format("YYYY-MM-DD"),
+    startTime,
+    endTime || "",
+    cycle,
+    "",
+  ];
+
+  await appendSheetValues({
+    data: {
+      sheetUrl,
+      range,
+      values: [newEntry],
+    },
+  });
+}
+
+export async function updateSleepEntry(params: {
+  sheetUrl: string;
+  rowIndex: number;
+  date: dayjs.Dayjs;
+  startTime: string;
+  endTime?: string;
+  cycle: "Day" | "Night";
+}): Promise<void> {
+  const { sheetUrl, rowIndex, date, startTime, endTime, cycle } = params;
+  if (!Number.isInteger(rowIndex) || rowIndex < 2) {
+    throw new Error("rowIndex must be a valid sheet row");
+  }
+
+  const range = `${SLEEP_SHEET}!B${rowIndex}:E${rowIndex}`;
+  await updateSheetValues({
+    data: {
+      sheetUrl,
+      range,
+      values: [[date.format("YYYY-MM-DD"), startTime, endTime || "", cycle]],
+    },
+  });
+}
+
+export async function deleteSleepEntry(params: {
+  sheetUrl: string;
+  rowIndex: number;
+}): Promise<void> {
+  const { sheetUrl, rowIndex } = params;
+  if (!Number.isInteger(rowIndex) || rowIndex < 2) {
+    throw new Error("rowIndex must be a valid sheet row");
+  }
+
+  await deleteSheetRow({
+    data: {
+      sheetUrl,
+      sheetName: SLEEP_SHEET,
+      rowIndex,
+    },
+  });
+}

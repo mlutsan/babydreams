@@ -11,6 +11,7 @@ import { EatStats } from "~/components/mobile/EatStats";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { Milk } from "lucide-react";
 import dayjs from "dayjs";
+import { getCycleDateForDatetime } from "~/lib/date-utils";
 
 export const Route = createFileRoute("/eat")({
   component: Eat,
@@ -40,7 +41,6 @@ function Eat() {
   // Get today's sleep stat for current cycle date
   const sleepQuery = useTodaySleepStat();
   const {
-    todayStat: todaySleepStat,
     isFetched: isSleepFetched,
     allStats: allSleepStats,
   } = sleepQuery;
@@ -62,16 +62,15 @@ function Eat() {
 
     const now = dayjs();
 
-    // Use sleep's logical date when available, fallback to calendar date
-    const todayLogicalDate = todaySleepStat?.logicalDate
-      ?? now.format("YYYY-MM-DD");
+    const todayLogicalDate =
+      getCycleDateForDatetime(now, allSleepStats, now).format("YYYY-MM-DD");
 
     const today = allStats.find((stat) =>
       stat.date.format("YYYY-MM-DD") === todayLogicalDate
     );
 
     return today || null;
-  }, [allStats, todaySleepStat]);
+  }, [allStats, allSleepStats]);
 
   // Calculate time since last meal in HH:mm format (must be before any returns)
   const lastMeal = todayStat?.entries[todayStat.entries.length - 1];

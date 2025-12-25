@@ -6,7 +6,7 @@
 
 import dayjs, { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
-import { parseRow, calculateSleepDuration } from "~/lib/sleep-utils";
+import { parseRow, calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
 import { getSheetValues } from "~/server/proxy";
 import { formatDuration } from "~/lib/date-utils";
 import type { SleepEntry, DailyStat as DailyStatType } from "~/types/sleep";
@@ -123,9 +123,13 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
 
       if (entry.endTime === null) {
         // Active sleep - calculate to now
-        isActive = true;
-        durationMinutes = Math.round((now.unix() - entry.realDatetime.unix()) / 60);
-        entryEndDatetime = now;
+        const resolved = resolveActiveSleepEnd({
+          startDatetime: entry.realDatetime,
+          now,
+        });
+        isActive = resolved.isActive;
+        durationMinutes = resolved.durationMinutes;
+        entryEndDatetime = resolved.endDatetime;
       } else {
         // Completed sleep
         durationMinutes = calculateSleepDuration(entry.startTime, entry.endTime);

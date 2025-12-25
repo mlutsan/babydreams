@@ -5,6 +5,7 @@
 
 import dayjs, { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
+import type { DailyStat } from "~/types/sleep";
 
 
 /**
@@ -82,6 +83,51 @@ export function getTodayDate(): string {
  */
 export function getYesterdayDate(): string {
   return dayjs().subtract(1, "day").format("YYYY-MM-DD");
+}
+
+/**
+ * Resolve cycle date (logical day start) for a given datetime.
+ * Falls back to today/yesterday only to avoid drifting into older gaps.
+ */
+export function getCycleDateForDatetime(
+  datetime: Dayjs,
+  sleepStats?: DailyStat[],
+  now: Dayjs = dayjs()
+): Dayjs {
+  if (!sleepStats || sleepStats.length === 0) {
+    return datetime.startOf("day");
+  }
+
+  const yesterday = now.subtract(1, "day");
+  const recentStats = sleepStats.filter((stat) => {
+    return stat.startDatetime.isSame(now, "day") || stat.startDatetime.isSame(yesterday, "day");
+  });
+
+  const match = recentStats.find((stat) => {
+    const startsBefore = datetime.isSame(stat.startDatetime) || datetime.isAfter(stat.startDatetime);
+    const endsAfter = datetime.isSame(stat.endDatetime) || datetime.isBefore(stat.endDatetime);
+    return startsBefore && endsAfter;
+  });
+
+  if (match) {
+    return match.startDatetime;
+  }
+
+  const latestRecent = recentStats.reduce<DailyStat | null>((latest, stat) => {
+    if (!latest) {
+      return stat;
+    }
+    return stat.startDatetime.isAfter(latest.startDatetime) ? stat : latest;
+  }, null);
+
+  if (latestRecent) {
+    const minutesSinceStart = datetime.diff(latestRecent.startDatetime, "minute");
+    if (minutesSinceStart >= 0 && minutesSinceStart <= 24 * 60) {
+      return latestRecent.startDatetime;
+    }
+  }
+
+  return datetime.startOf("day");
 }
 
 /**

@@ -56,6 +56,11 @@ export interface AppendValuesResponse {
   [key: string]: unknown;
 }
 
+export interface BatchUpdateResponse {
+  replies?: unknown[];
+  [key: string]: unknown;
+}
+
 
 /**
  * Google Sheets API client
@@ -180,5 +185,31 @@ export class GoogleSheetsClient {
     return this.request<Record<string, unknown>>(`/values/${encodeURIComponent(range)}:clear`, {
       method: "POST",
     });
+  }
+
+  /**
+   * Run a batch update request
+   */
+  async batchUpdate(requests: unknown[]): Promise<BatchUpdateResponse> {
+    return this.request<BatchUpdateResponse>(`/:batchUpdate`, {
+      method: "POST",
+      body: JSON.stringify({ requests }),
+    });
+  }
+
+  /**
+   * Delete rows from a sheet
+   */
+  async deleteRows(sheetId: number, startIndex: number, endIndex: number): Promise<BatchUpdateResponse> {
+    return this.batchUpdate([{
+      deleteDimension: {
+        range: {
+          sheetId,
+          dimension: "ROWS",
+          startIndex,
+          endIndex,
+        },
+      },
+    }]);
   }
 }

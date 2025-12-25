@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { getHistory } from "~/lib/history-service";
 import dayjs from "dayjs";
+import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
 
 /**
  * Hook for fetching sleep history data
@@ -74,18 +75,33 @@ export function useTodaySleepStat() {
     const lastEntry = todayStat.entries[todayStat.entries.length - 1];
 
     if (lastEntry.endTime === null) {
-      // Baby is currently sleeping
-      const sleepStartTime = lastEntry.startTime.format("HH:mm");
-      const durationMinutes = Math.round((now.unix() - lastEntry.realDatetime.unix()) / 60);
+      const resolved = resolveActiveSleepEnd({
+        startDatetime: lastEntry.realDatetime,
+        now,
+      });
 
+      if (resolved.isActive) {
+        const sleepStartTime = lastEntry.startTime.format("HH:mm");
+        return {
+          isActive: true,
+          startTime: sleepStartTime,
+          duration: resolved.durationMinutes,
+          cycle: lastEntry.cycle,
+          date: lastEntry.date.format("YYYY-MM-DD"),
+          awakeStartTime: null,
+          awakeDuration: 0,
+        };
+      }
+
+      const awakeDuration = Math.round((now.unix() - resolved.endDatetime.unix()) / 60);
       return {
-        isActive: true,
-        startTime: sleepStartTime,
-        duration: durationMinutes,
+        isActive: false,
+        startTime: null,
+        duration: 0,
         cycle: lastEntry.cycle,
         date: lastEntry.date.format("YYYY-MM-DD"),
-        awakeStartTime: null,
-        awakeDuration: 0,
+        awakeStartTime: resolved.endDatetime.format("HH:mm"),
+        awakeDuration,
       };
     } else {
       // Baby is awake

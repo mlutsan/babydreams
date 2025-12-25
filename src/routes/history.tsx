@@ -6,25 +6,34 @@ import { sheetUrlAtom } from "~/lib/atoms";
 import {
   Block,
   BlockTitle,
-  List,
-  ListItem,
+  Button,
+  Card,
   Preloader,
-  Segmented,
-  SegmentedButton,
 } from "konsta/react";
-import { Moon } from "lucide-react";
+import { Plus, Pencil, ExternalLinkIcon } from "lucide-react";
 import { getHistory } from "~/lib/history-service";
 import { formatDuration } from "~/lib/date-utils";
 import dayjs from "dayjs";
+import type { SleepEntry, DailyStat } from "~/types/sleep";
+import { HistoryDayCard } from "~/components/history/HistoryDayCard";
+import { SleepModal } from "~/components/mobile/SleepModal";
+import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
 
 export const Route = createFileRoute("/history")({
   component: History,
 });
 
+const MAX_DAYS = 30;
+
 function History() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
-  const [selectedPeriod, setSelectedPeriod] = useState<"recent" | "all">("recent");
   const [isHydrated, setIsHydrated] = useState(false);
+  const [expandedDayIds, setExpandedDayIds] = useState<string[]>([]);
+  const [sleepModalOpen, setSleepModalOpen] = useState(false);
+  const [sleepModalMode, setSleepModalMode] = useState<"add" | "edit">("add");
+  const [sleepModalEntry, setSleepModalEntry] = useState<SleepEntry | null>(null);
+  const [sleepModalDate, setSleepModalDate] = useState<dayjs.Dayjs | null>(null);
+  const [sleepModalAllowActive, setSleepModalAllowActive] = useState(false);
 
   // Wait for atoms to hydrate from storage
   useEffect(() => {
@@ -39,20 +48,42 @@ function History() {
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 
-  // Filter stats based on selected period
-  const filteredStats = useMemo(() => {
+  const statsSorted = useMemo(() => {
     if (!allStats) {
       return [];
     }
+    return [...allStats].sort(
+      (a, b) => a.startDatetime.unix() - b.startDatetime.unix()
+    );
+  }, [allStats]);
 
-    if (selectedPeriod === "recent") {
-      // Show last 7 days
-      const sevenDaysAgo = dayjs().subtract(7, "days");
-      return allStats.filter(stat => stat.startDatetime.isAfter(sevenDaysAgo));
+  const statsByLogicalDate = useMemo(() => {
+    return new Map(statsSorted.map((stat) => [stat.logicalDate, stat]));
+  }, [statsSorted]);
+
+  const daysToDisplay = useMemo(() => {
+    const days: Array<{ logicalDate: string; stat?: DailyStat; }> = [];
+    for (let i = 0; i < MAX_DAYS; i += 1) {
+      const logicalDate = dayjs().subtract(i, "day").format("YYYY-MM-DD");
+      days.push({
+        logicalDate,
+        stat: statsByLogicalDate.get(logicalDate),
+      });
     }
+    return days;
+  }, [statsByLogicalDate]);
 
-    return allStats;
-  }, [allStats, selectedPeriod]);
+  const mostRecentLogicalDate = daysToDisplay[0]?.logicalDate;
+  const windowStart = dayjs().subtract(MAX_DAYS - 1, "day").startOf("day");
+  const hasOlderData = statsSorted.some((stat) =>
+    dayjs(stat.logicalDate).isBefore(windowStart, "day")
+  );
+
+  useEffect(() => {
+    if (daysToDisplay.length > 0 && expandedDayIds.length === 0) {
+      setExpandedDayIds([daysToDisplay[0].logicalDate]);
+    }
+  }, [daysToDisplay, expandedDayIds.length]);
 
   // Show loading while atoms hydrate from storage
   if (!isHydrated) {
@@ -73,100 +104,191 @@ function History() {
     );
   }
 
-  // Reverse to show most recent first
-  const statsToDisplay = [...filteredStats].reverse();
+  const now = dayjs();
+
+  const toggleExpanded = (dayId: string) => {
+    setExpandedDayIds((prev) =>
+      prev.includes(dayId) ? prev.filter((id) => id !== dayId) : [...prev, dayId]
+    );
+  };
+
+  const entryKey = (entry: SleepEntry, entryIndex: number) => {
+    if (entry.sheetRowIndex) {
+      return `row-${entry.sheetRowIndex}`;
+    }
+    return `${entry.realDatetime.unix()}-${entryIndex}`;
+  };
+
+  const openAddModal = (logicalDate: string, allowActiveToggle: boolean) => {
+    setSleepModalMode("add");
+    setSleepModalEntry(null);
+    setSleepModalDate(dayjs(logicalDate));
+    setSleepModalAllowActive(allowActiveToggle);
+    setSleepModalOpen(true);
+    if (!expandedDayIds.includes(logicalDate)) {
+      setExpandedDayIds((prev) => [...prev, logicalDate]);
+    }
+  };
+
+  const openEditModal = (entry: SleepEntry, allowActiveToggle: boolean) => {
+    setSleepModalMode("edit");
+    setSleepModalEntry(entry);
+    setSleepModalDate(null);
+    setSleepModalAllowActive(allowActiveToggle);
+    setSleepModalOpen(true);
+  };
+
+  const closeSleepModal = () => {
+    setSleepModalOpen(false);
+    setSleepModalEntry(null);
+    setSleepModalDate(null);
+  };
 
   return (
     <>
-
-      {/* Period Selector */}
-      <Block>
-        <Segmented rounded strong>
-          <SegmentedButton
-            active={selectedPeriod === "recent"}
-            onClick={() => setSelectedPeriod("recent")}
-          >
-            Last 7 Days
-          </SegmentedButton>
-          <SegmentedButton
-            active={selectedPeriod === "all"}
-            onClick={() => setSelectedPeriod("all")}
-          >
-            All Time
-          </SegmentedButton>
-        </Segmented>
-      </Block>
-
       {isLoading ? (
         <Block className="text-center py-8">
           <Preloader />
         </Block>
-      ) : statsToDisplay.length > 0 ? (
+      ) : daysToDisplay.length > 0 ? (
         <>
-          <BlockTitle>Daily Sleep Stats</BlockTitle>
-          <List strongIos insetIos>
-            {statsToDisplay.map((stat, index) => {
-              const dateRange = `${stat.startDatetime.format("MMM D")}${!stat.startDatetime.isSame(stat.endDatetime, "day")
-                ? ` - ${stat.endDatetime.format("MMM D")}`
-                : ""
-              }`;
+          <div className="space-y-4">
+            {daysToDisplay.map((day) => {
+              const isToday = dayjs(day.logicalDate).isSame(now, "day");
+              const isYesterday = dayjs(day.logicalDate).isSame(now.subtract(1, "day"), "day");
+              const dateRange = isToday
+                ? "Today"
+                : isYesterday
+                  ? "Yesterday"
+                  : day.stat
+                    ? `${day.stat.startDatetime.format("MMM D")}${!day.stat.startDatetime.isSame(day.stat.endDatetime, "day")
+                      ? ` - ${day.stat.endDatetime.format("MMM D")}`
+                      : ""
+                    }`
+                    : dayjs(day.logicalDate).format("MMM D");
+              const summary = day.stat
+                ? `☀️ ${formatDuration(day.stat.daySleepMinutes)} • 🌙 ${formatDuration(day.stat.nightSleepMinutes)}`
+                : "No entries yet";
+              const isExpanded = expandedDayIds.includes(day.logicalDate);
+              const entriesSorted = [...(day.stat?.entries ?? [])].sort(
+                (a, b) => b.realDatetime.unix() - a.realDatetime.unix()
+              );
+              const isMostRecentStat = day.logicalDate === mostRecentLogicalDate;
+              const isStatToday = dayjs(day.logicalDate).isSame(now, "day");
+              const allowActiveToggleForDay = isMostRecentStat && isStatToday;
 
               return (
-                <ListItem
-                  key={index}
+                <HistoryDayCard
+                  key={day.logicalDate}
                   title={dateRange}
-                  after={formatDuration(stat.totalSleepMinutes)}
-                  subtitle={
-                    <div className="space-y-2 mt-2">
-                      {/* Total Stats */}
-                      <div className="flex gap-4 text-xs">
-                        <span>😴 {formatDuration(stat.totalSleepMinutes)}</span>
-                        <span>👁️ {formatDuration(stat.awakeMinutes)}</span>
-                        <span>📊 {stat.sessionCount} sessions</span>
+                  summary={summary}
+                  isExpanded={isExpanded}
+                  onToggle={() => toggleExpanded(day.logicalDate)}
+                  actions={
+                    <Button
+                      small
+                      rounded
+                      className="min-w-0 px-2 py-2"
+                      onClick={() => openAddModal(day.logicalDate, allowActiveToggleForDay)}
+                      aria-label="Add entry"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </Button>
+                  }
+                >
+                  <div className="space-y-2">
+                    {!day.stat || entriesSorted.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-gray-200 dark:border-gray-700 px-3 py-2 text-sm text-gray-500">
+                        No entries yet
                       </div>
+                    ) : null}
+                    {entriesSorted.map((entry, entryIndex) => {
+                      const key = entryKey(entry, entryIndex);
+                      const startLabel = entry.startTime.format("HH:mm");
+                      let endLabel = entry.endTime ? entry.endTime.format("HH:mm") : "Now";
+                      let durationMinutes = 0;
+                      let statusLabel = "";
 
-                      {/* Day/Night Breakdown */}
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 rounded px-2 py-1">
-                          <div className="text-xs opacity-70">☀️ Day Sleep</div>
-                          <div className="text-xs font-semibold">
-                            {formatDuration(stat.daySleepMinutes)}
+                      if (entry.endTime) {
+                        durationMinutes = calculateSleepDuration(entry.startTime, entry.endTime);
+                      } else {
+                        const resolved = resolveActiveSleepEnd({
+                          startDatetime: entry.realDatetime,
+                          now,
+                        });
+                        durationMinutes = resolved.durationMinutes;
+                        if (resolved.wasCapped) {
+                          endLabel = resolved.endDatetime.format("HH:mm");
+                          statusLabel = "Auto-ended";
+                        } else {
+                          statusLabel = "Active";
+                        }
+                      }
+
+                      const allowActiveToggle = allowActiveToggleForDay && entryIndex === 0;
+                      return (
+                        <div
+                          key={key}
+                          className="flex items-start justify-between gap-3 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900/40 px-3 py-2"
+                        >
+                          <div className="space-y-1">
+                            <div className="text-sm font-semibold">
+                              {startLabel} - {endLabel}
+                            </div>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              {formatDuration(durationMinutes)} • {entry.cycle}
+                            </div>
+                            {statusLabel ? (
+                              <div className="text-xs text-amber-600">
+                                {statusLabel}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-row gap-1">
+                            <Button
+                              onClick={() => openEditModal(entry, allowActiveToggle)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
                           </div>
                         </div>
-                        <div className="bg-purple-50 dark:bg-purple-900/20 rounded px-2 py-1">
-                          <div className="text-xs opacity-70">🌙 Night Sleep</div>
-                          <div className="text-xs font-semibold">
-                            {formatDuration(stat.nightSleepMinutes)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Active indicator */}
-                      {stat.hasActiveSleep && (
-                        <div className="text-xs bg-green-100 dark:bg-green-900 px-2 py-1 rounded inline-block">
-                          🟢 Currently sleeping
-                        </div>
-                      )}
-                    </div>
-                  }
-                  media={
-                    <div className="w-10 h-10 rounded-full flex items-center justify-center bg-blue-100 dark:bg-blue-900">
-                      <Moon className="w-5 h-5 text-blue-600 dark:text-blue-300" />
-                    </div>
-                  }
-                />
+                      );
+                    })}
+                  </div>
+                </HistoryDayCard>
               );
             })}
-          </List>
+          </div>
+          {hasOlderData ? (
+
+            <Card className="pt-4" header="For older data:">
+              <Button
+                large
+                rounded
+                onClick={() => window.open(sheetUrl, "_blank", "noopener,noreferrer")}
+              >
+                Open Google Sheets
+                <ExternalLinkIcon className="ml-2" />
+              </Button>
+            </Card>
+          ) : null}
         </>
       ) : (
         <Block strong inset className="text-center">
           <div className="py-8 opacity-70">
-            <div className="text-4xl mb-2">😴</div>
-            <div>No sleep data available</div>
+            <div className="text-base">No sleep data available</div>
           </div>
         </Block>
       )}
+
+      <SleepModal
+        opened={sleepModalOpen}
+        onClose={closeSleepModal}
+        mode={sleepModalMode}
+        entry={sleepModalEntry ?? undefined}
+        initialDate={sleepModalDate ?? undefined}
+        allowActiveToggle={sleepModalAllowActive}
+      />
     </>
   );
 }

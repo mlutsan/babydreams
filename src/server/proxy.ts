@@ -102,6 +102,42 @@ export const updateSheetValues = createServerFn({ method: "POST" })
   });
 
 /**
+ * Delete a single row from a sheet
+ */
+export const deleteSheetRow = createServerFn({ method: "POST" })
+  .inputValidator((data: {
+    sheetUrl: string;
+    sheetName: string;
+    rowIndex: number;
+  }) => {
+    if (!data.sheetUrl) {
+      throw new Error("Sheet URL is required");
+    }
+    if (!data.sheetName) {
+      throw new Error("Sheet name is required");
+    }
+    if (!Number.isInteger(data.rowIndex) || data.rowIndex < 1) {
+      throw new Error("rowIndex must be a positive integer");
+    }
+    return data;
+  })
+  .handler(async ({ data }) => {
+    const client = await getClient(data.sheetUrl);
+    const metadata = await client.getSpreadsheetMetadata();
+    const sheet = metadata.sheets?.find(
+      (item) => item.properties?.title === data.sheetName
+    );
+    const sheetId = sheet?.properties?.sheetId;
+    if (sheetId === undefined) {
+      throw new Error(`Sheet not found: ${data.sheetName}`);
+    }
+
+    const startIndex = data.rowIndex - 1;
+    const endIndex = data.rowIndex;
+    return client.deleteRows(sheetId, startIndex, endIndex) as any;
+  });
+
+/**
  * Get spreadsheet metadata
  */
 export const getSheetMetadata = createServerFn({ method: "POST" })

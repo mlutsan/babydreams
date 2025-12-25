@@ -51,7 +51,10 @@ export function MobileLayout({ children }: MobileLayoutProps) {
               <NavbarBackLink onClick={() => window.history.back()} ></NavbarBackLink>
             ) : undefined}
           />
-          <PullToRefresh queryKeys={queryKeys}>
+          <PullToRefresh
+            queryKeys={queryKeys}
+            resetScrollKey={router.location.pathname}
+          >
             {children}
             <div className="h-[180px]"></div>
           </PullToRefresh>

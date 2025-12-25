@@ -16,6 +16,7 @@ import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { localPoint } from "@visx/event";
 import type { DailyEatStat } from "~/lib/eat-service";
 import type { DailyStat } from "~/types/sleep";
+import { useCurrentTimeMinutes } from "~/hooks/useCurrentTimeMinutes";
 
 interface MealCircle {
   type: "meal";
@@ -196,9 +197,8 @@ export function EatOverviewChart({
   });
 
   // Current time indicator - always show
-  const now = dayjs();
-  const currentTimeSimple = now.hour() * 60 + now.minute();
-  const currentTimeY = timeScale(currentTimeSimple);
+  const { currentTimeMinutes } = useCurrentTimeMinutes(sleepStats);
+  const currentTimeY = timeScale(currentTimeMinutes);
   const showCurrentTimeIndicator = currentTimeY >= 0 && currentTimeY <= TIMELINE_HEIGHT;
 
   // Today index for highlighting
@@ -217,7 +217,7 @@ export function EatOverviewChart({
         const dayOffset = entry.datetime.startOf("day").diff(entry.cycleDate.startOf("day"), "days") * 24 * 60;
 
         const entryTimeMinutes = dayOffset + entry.datetime.hour() * 60 + entry.datetime.minute();
-        if (entryTimeMinutes <= currentTimeSimple) {
+        if (entryTimeMinutes <= currentTimeMinutes) {
           cumulativeVolume += entry.volume;
         }
       });
@@ -226,7 +226,7 @@ export function EatOverviewChart({
     });
 
     return result;
-  }, [sortedDailyStats, currentTimeSimple]);
+  }, [sortedDailyStats, currentTimeMinutes]);
 
   // Handle tooltip
   const handleCircleInteraction = (

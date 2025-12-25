@@ -11,7 +11,7 @@ import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useEatMutation } from "~/hooks/useEatMutation";
 import dayjs from "dayjs";
-import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
+import { addMinutesToTime, getTimeAgoFromManualInput, getCycleDateForDatetime } from "~/lib/date-utils";
 
 interface EatModalProps {
   opened: boolean;
@@ -21,11 +21,9 @@ interface EatModalProps {
 export function EatModal({ opened, onClose }: EatModalProps) {
   const babyName = useAtomValue(babyNameAtom);
   const sheetUrl = useAtomValue(sheetUrlAtom);
-  const { todayStat, isFetched } = useTodaySleepStat();
+  const { allStats: allSleepStats } = useTodaySleepStat();
   const mutation = useEatMutation();
 
-  // Determine current cycle date from sleep stats
-  const currentCycleDate = todayStat?.startDatetime ?? (isFetched ? dayjs() : null);
   const [volume, setVolume] = useState(100); // Default 100ml
   const [selectedTime, setSelectedTime] = useState("");
   const timeInputRef = useRef<HTMLInputElement>(null);
@@ -71,7 +69,7 @@ export function EatModal({ opened, onClose }: EatModalProps) {
   };
 
   const handleConfirm = () => {
-    if (!selectedTime || !sheetUrl || !currentCycleDate) {
+    if (!selectedTime || !sheetUrl) {
       return;
     }
 
@@ -85,12 +83,14 @@ export function EatModal({ opened, onClose }: EatModalProps) {
       datetime = datetime.subtract(1, "day");
     }
 
+    const cycleDate = getCycleDateForDatetime(datetime, allSleepStats);
+
     mutation.mutate(
       {
         sheetUrl,
         volume,
         datetime,
-        cycleDate: currentCycleDate,
+        cycleDate,
       },
       {
         onSuccess: onClose,
@@ -164,9 +164,9 @@ export function EatModal({ opened, onClose }: EatModalProps) {
                 max={200}
                 step={10}
                 onChange={(e) => setVolume(Number(e.target.value))}
-                onTouchStart={handleSliderInteraction}
-                onTouchMove={handleSliderInteraction}
-                onClick={handleSliderInteraction}
+              //onTouchStart={handleSliderInteraction}
+              //onTouchMove={handleSliderInteraction}
+              //onClick={handleSliderInteraction}
               />
             </div>
           </div>
@@ -201,7 +201,7 @@ export function EatModal({ opened, onClose }: EatModalProps) {
               large
               rounded
               onClick={handleConfirm}
-              disabled={mutation.isPending || !currentCycleDate}
+              disabled={mutation.isPending}
               className="bg-amber-500 active:bg-amber-600"
             >
               {mutation.isPending ? "Om-nom-noming..." : "Confirm"}

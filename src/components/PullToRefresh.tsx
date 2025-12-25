@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect } from "react";
 import { Preloader } from "konsta/react";
 import { usePullToRefresh } from "~/hooks/usePullToRefresh";
 
@@ -22,6 +22,10 @@ interface PullToRefreshProps {
    * @default true
    */
   enabled?: boolean;
+  /**
+   * Reset scroll position when this key changes
+   */
+  resetScrollKey?: string;
 }
 
 /**
@@ -33,7 +37,8 @@ export function PullToRefresh({
   queryKeys,
   onRefresh,
   threshold = 85,
-  enabled = false,
+  enabled = true,
+  resetScrollKey,
 }: PullToRefreshProps) {
   const { containerRef, pullChange, isRefreshing } = usePullToRefresh({
     threshold,
@@ -41,6 +46,12 @@ export function PullToRefresh({
     onRefresh,
     enabled,
   });
+
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({ top: 0, behavior: "auto" });
+    }
+  }, [resetScrollKey, containerRef]);
 
   // Calculate opacity and rotation for visual feedback
   const progress = Math.min(pullChange / threshold, 1);

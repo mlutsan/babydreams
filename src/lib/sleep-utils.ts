@@ -10,6 +10,9 @@ import type { SleepEntry } from "~/types/sleep";
 
 dayjs.extend(duration);
 
+const MAX_ACTIVE_HOURS = 24;
+const MAX_DURATION_HOURS = 16;
+
 /**
  * Normalize cell value to string
  */
@@ -89,4 +92,40 @@ export function calculateSleepDuration(
   }
 
   return diff;
+}
+
+/**
+ * Resolve an active sleep session end time.
+ * If it's older than maxActiveHours, cap duration to maxDurationHours.
+ */
+export function resolveActiveSleepEnd(params: {
+  startDatetime: dayjs.Dayjs;
+  now: dayjs.Dayjs;
+}): {
+  endDatetime: dayjs.Dayjs;
+  durationMinutes: number;
+  isActive: boolean;
+  wasCapped: boolean;
+} {
+  const { startDatetime, now } = params;
+
+  const elapsedMinutes = now.diff(startDatetime, "minutes");
+  const maxActiveMinutes = MAX_ACTIVE_HOURS * 60;
+
+  if (elapsedMinutes > maxActiveMinutes) {
+    const endDatetime = startDatetime.add(MAX_DURATION_HOURS, "hour");
+    return {
+      endDatetime,
+      durationMinutes: endDatetime.diff(startDatetime, "minutes"),
+      isActive: false,
+      wasCapped: true,
+    };
+  }
+
+  return {
+    endDatetime: now,
+    durationMinutes: elapsedMinutes,
+    isActive: true,
+    wasCapped: false,
+  };
 }
