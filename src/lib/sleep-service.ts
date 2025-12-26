@@ -9,7 +9,7 @@ import { getSheetValues, appendSheetValues, updateSheetValues, deleteSheetRow } 
 import { DailyStat } from "~/types/sleep";
 
 const SLEEP_SHEET = "Sleep";
-const HEADERS = ["Added Date", "Date", "Start Time", "End Time", "Cycle", "Length"] as const;
+const HEADERS = ["Added Date", "Date", "Start Time", "End Time", "Cycle"] as const;
 
 async function ensureSleepHeaders(sheetUrl: string) {
   const range = `${SLEEP_SHEET}!A:F`;
@@ -24,7 +24,7 @@ async function ensureSleepHeaders(sheetUrl: string) {
         sheetUrl,
         range: `${SLEEP_SHEET}!A1:F1`,
         values: [
-          [HEADERS[0], HEADERS[1], HEADERS[2], HEADERS[3], HEADERS[4], HEADERS[5]],
+          [HEADERS[0], HEADERS[1], HEADERS[2], HEADERS[3], HEADERS[4]],
         ],
       },
     });
