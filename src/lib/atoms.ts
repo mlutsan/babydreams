@@ -4,6 +4,8 @@
  */
 
 import { atom } from "jotai";
+import type { Dayjs } from "dayjs";
+import type { SleepEntry } from "~/types/sleep";
 import { atomWithStorage } from "jotai/utils";
 
 /**
@@ -98,6 +100,24 @@ export const cycleSettingsAtom = atomWithStorage<CycleSettings>(
   "cycle_settings",
   { dayStart: "08:00", dayEnd: "20:00" }
 );
+
+export type SleepModalMode = "track" | "edit" | "add";
+
+export interface SleepModalState {
+  open: boolean;
+  mode: SleepModalMode;
+  entry: SleepEntry | null;
+  initialDate: Dayjs | null;
+  allowActiveToggle: boolean;
+}
+
+export const sleepModalAtom = atom<SleepModalState>({
+  open: false,
+  mode: "track",
+  entry: null,
+  initialDate: null,
+  allowActiveToggle: false,
+});
 
 /**
  * Helper function to determine if a given time is Day or Night cycle

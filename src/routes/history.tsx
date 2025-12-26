@@ -16,8 +16,8 @@ import { formatDuration } from "~/lib/date-utils";
 import dayjs from "dayjs";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
 import { HistoryDayCard } from "~/components/history/HistoryDayCard";
-import { SleepModal } from "~/components/mobile/SleepModal";
 import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { useSleepModal } from "~/hooks/useSleepModal";
 
 export const Route = createFileRoute("/history")({
   component: History,
@@ -29,11 +29,7 @@ function History() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const [isHydrated, setIsHydrated] = useState(false);
   const [expandedDayIds, setExpandedDayIds] = useState<string[]>([]);
-  const [sleepModalOpen, setSleepModalOpen] = useState(false);
-  const [sleepModalMode, setSleepModalMode] = useState<"add" | "edit">("add");
-  const [sleepModalEntry, setSleepModalEntry] = useState<SleepEntry | null>(null);
-  const [sleepModalDate, setSleepModalDate] = useState<dayjs.Dayjs | null>(null);
-  const [sleepModalAllowActive, setSleepModalAllowActive] = useState(false);
+  const { openAdd, openEdit } = useSleepModal();
 
   // Wait for atoms to hydrate from storage
   useEffect(() => {
@@ -120,28 +116,14 @@ function History() {
   };
 
   const openAddModal = (logicalDate: string, allowActiveToggle: boolean) => {
-    setSleepModalMode("add");
-    setSleepModalEntry(null);
-    setSleepModalDate(dayjs(logicalDate));
-    setSleepModalAllowActive(allowActiveToggle);
-    setSleepModalOpen(true);
+    openAdd(dayjs(logicalDate), allowActiveToggle);
     if (!expandedDayIds.includes(logicalDate)) {
       setExpandedDayIds((prev) => [...prev, logicalDate]);
     }
   };
 
   const openEditModal = (entry: SleepEntry, allowActiveToggle: boolean) => {
-    setSleepModalMode("edit");
-    setSleepModalEntry(entry);
-    setSleepModalDate(null);
-    setSleepModalAllowActive(allowActiveToggle);
-    setSleepModalOpen(true);
-  };
-
-  const closeSleepModal = () => {
-    setSleepModalOpen(false);
-    setSleepModalEntry(null);
-    setSleepModalDate(null);
+    openEdit(entry, allowActiveToggle);
   };
 
   return (
@@ -281,14 +263,6 @@ function History() {
         </Block>
       )}
 
-      <SleepModal
-        opened={sleepModalOpen}
-        onClose={closeSleepModal}
-        mode={sleepModalMode}
-        entry={sleepModalEntry ?? undefined}
-        initialDate={sleepModalDate ?? undefined}
-        allowActiveToggle={sleepModalAllowActive}
-      />
     </>
   );
 }

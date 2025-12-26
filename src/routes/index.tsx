@@ -6,9 +6,9 @@ import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { History as HistoryIcon } from "lucide-react";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
-import { SleepModal } from "~/components/mobile/SleepModal";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useSleepModal } from "~/hooks/useSleepModal";
 import dayjs from "dayjs";
 
 export const Route = createFileRoute("/")({
@@ -18,8 +18,8 @@ export const Route = createFileRoute("/")({
 function Home() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const babyName = useAtomValue(babyNameAtom);
-  const [modalOpen, setModalOpen] = useState(false);
   const [now, setNow] = useState(dayjs());
+  const { openTrack } = useSleepModal();
 
   // Use the shared sleep history hook
   const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
@@ -203,7 +203,7 @@ function Home() {
         <Button
           large
           rounded
-          onClick={() => setModalOpen(true)}
+          onClick={openTrack}
           className="w-full mt-4"
         >
           {isSleeping ? "Woke up" : "Fall asleep"}
@@ -318,12 +318,6 @@ function Home() {
         </Link>
       </Block>
 
-      {/* Sleep Modal */}
-      <SleepModal
-        opened={modalOpen}
-        onClose={() => setModalOpen(false)}
-        isSleeping={isSleeping}
-      />
     </>
   );
 }

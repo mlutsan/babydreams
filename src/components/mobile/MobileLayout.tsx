@@ -7,6 +7,7 @@ import { Route as SettingsRoute } from "~/routes/settings";
 import { Route as HistoryRoute } from "~/routes/history";
 import { Route as EatRoute } from "~/routes/eat";
 import { PullToRefresh } from "~/components/PullToRefresh";
+import { SleepModalHost } from "~/components/mobile/SleepModalHost";
 import { useToast } from "~/hooks/useToast";
 
 interface MobileLayoutProps {
@@ -95,6 +96,8 @@ export function MobileLayout({ children }: MobileLayoutProps) {
             </ToolbarPane>
 
           </Tabbar>
+
+          <SleepModalHost />
 
           {/* Global Toast for all routes */}
           <Toast

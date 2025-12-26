@@ -5,7 +5,9 @@
  * Y-axis is continuous from earliest to latest time across all days
  */
 
-import { useMemo, useRef, useEffect, useState } from "react";
+import { useMemo, useRef, useEffect, useLayoutEffect, useState } from "react";
+import { useAtomValue } from "jotai";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import { scaleLinear, scaleBand } from "@visx/scale";
 import { Bar } from "@visx/shape";
@@ -14,11 +16,16 @@ import { AxisLeft, AxisRight } from "@visx/axis";
 import { Line } from "@visx/shape";
 import { Text } from "@visx/text";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
-import { localPoint } from "@visx/event";
-import type { DailyStat } from "~/types/sleep";
+import { Button } from "konsta/react";
+import type { DailyStat, SleepEntry } from "~/types/sleep";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
 import { useCurrentTimeMinutes } from "~/hooks/useCurrentTimeMinutes";
+import { sheetUrlAtom } from "~/lib/atoms";
+import { deleteSleepEntry } from "~/lib/sleep-service";
+import { useToast } from "~/hooks/useToast";
+import { useSleepModal } from "~/hooks/useSleepModal";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface SleepBar {
   id: string;
@@ -31,6 +38,8 @@ interface SleepBar {
   isActive: boolean;
   startTime: string; // For tooltip display
   endTime: string;
+  entry: SleepEntry;
+  allowActiveToggle: boolean;
 }
 
 interface DailySleepBar {
@@ -53,6 +62,7 @@ const DAY_COLUMN_WIDTH = 60; // Width per day column
 const TIMELINE_HEIGHT = 400;
 const BAR_CHART_HEIGHT = 200;
 const GAP_BETWEEN_SECTIONS = 40;
+const TOOLTIP_PADDING = 12;
 
 export function ResponsiveSleepTimeline({
   allDayStats,
@@ -63,6 +73,12 @@ export function ResponsiveSleepTimeline({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
   const tooltipTimeout = useRef<number | undefined>(undefined);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [tooltipSize, setTooltipSize] = useState({ width: 0, height: 0 });
+  const sheetUrl = useAtomValue(sheetUrlAtom);
+  const queryClient = useQueryClient();
+  const { error } = useToast();
+  const { openEdit } = useSleepModal();
 
   // Track which bar is currently highlighted
   const [highlightedBarId, setHighlightedBarId] = useState<string | null>(null);
@@ -79,7 +95,7 @@ export function ResponsiveSleepTimeline({
 
   const { containerRef, TooltipInPortal } = useTooltipInPortal({
     scroll: true,
-    detectBounds: true,
+    detectBounds: false,
     zIndex: 1000
   });
 
@@ -89,6 +105,8 @@ export function ResponsiveSleepTimeline({
     const bars: SleepBar[] = [];
     let minTimeMinutes = Infinity;
     let maxTimeMinutes = -Infinity;
+    const todayLogicalDate = dayjs().format("YYYY-MM-DD");
+    const mostRecentStatIndex = allDayStats.length - 1;
 
 
     allDayStats.forEach((dayStat) => {
@@ -101,6 +119,8 @@ export function ResponsiveSleepTimeline({
     });
 
     allDayStats.forEach((dayStat, dayIndex) => {
+      const allowActiveToggleForDay =
+        dayIndex === mostRecentStatIndex && dayStat.logicalDate === todayLogicalDate;
       dayStat.entries.forEach((entry, entryIndex) => {
         const sleepStart = entry.realDatetime;
 
@@ -132,6 +152,8 @@ export function ResponsiveSleepTimeline({
         const startTimeOfDay = hoursStart + sleepStart.hour() * 60 + sleepStart.minute();
         const endTimeOfDay = hoursEnd + sleepEnd.hour() * 60 + sleepEnd.minute();
 
+        const isLatestEntry = entryIndex === dayStat.entries.length - 1;
+
         bars.push({
           id: `${dayStat.logicalDate}-${entryIndex}`,
           dayIndex,
@@ -143,6 +165,8 @@ export function ResponsiveSleepTimeline({
           isActive,
           startTime: sleepStart.format("HH:mm"),
           endTime: isActive ? "Now" : sleepEnd.format("HH:mm"),
+          entry,
+          allowActiveToggle: allowActiveToggleForDay && isLatestEntry,
         });
       });
     });
@@ -214,7 +238,7 @@ export function ResponsiveSleepTimeline({
 
   // Handle tooltip show/hide
   const handleBarInteraction = (
-    event: React.MouseEvent | React.TouchEvent,
+    _event: React.MouseEvent | React.TouchEvent,
     bar: SleepBar,
     barX: number,
     barWidth: number
@@ -227,12 +251,9 @@ export function ResponsiveSleepTimeline({
     // Highlight the bar
     setHighlightedBarId(bar.id);
 
-    // Get event coordinates relative to SVG
-    const eventSvgCoords = localPoint(event);
-
-    // Position tooltip at center of bar horizontally, above the touch point
-    const left = barX + barWidth / 2;
-    const top = (eventSvgCoords?.y || 0) - 120;
+    const barY = yScale(bar.startMinutes);
+    const left = margin.left + barX + barWidth / 2;
+    const top = margin.top + barY;
 
     showTooltip({
       tooltipData: bar,
@@ -251,17 +272,18 @@ export function ResponsiveSleepTimeline({
 
   // Handle total bar tooltip
   const handleTotalBarInteraction = (
-    event: React.MouseEvent | React.TouchEvent,
+    _event: React.MouseEvent | React.TouchEvent,
     dayStat: DailyStat,
     barX: number
   ) => {
     if (tooltipTimeout.current) {
       clearTimeout(tooltipTimeout.current);
     }
+    setHighlightedBarId(null);
 
-    const eventSvgCoords = localPoint(event);
-    const left = barX + columnWidth / 2;
-    const top = (eventSvgCoords?.y || 0) - 100;
+    const left = margin.left + barX + columnWidth / 2;
+    const barTop = barSleepScale(dayStat.totalSleepMinutes);
+    const top = margin.top + TIMELINE_HEIGHT + GAP_BETWEEN_SECTIONS + barTop;
 
     showTooltip({
       tooltipData: {
@@ -280,7 +302,72 @@ export function ResponsiveSleepTimeline({
   const handleTotalBarLeave = () => {
     tooltipTimeout.current = window.setTimeout(() => {
       hideTooltip();
+      setHighlightedBarId(null);
     }, 300);
+  };
+
+  useEffect(() => {
+    if (tooltipOpen && tooltipData && "type" in tooltipData && tooltipData.type === "daily") {
+      setHighlightedBarId(null);
+    }
+  }, [tooltipOpen, tooltipData]);
+
+  useEffect(() => {
+    if (!tooltipOpen) {
+      return;
+    }
+
+    const handleOutsidePress = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (tooltipRef.current?.contains(target)) {
+        return;
+      }
+      if (target.closest("[data-tooltip-anchor]")) {
+        return;
+      }
+      hideTooltip();
+      setHighlightedBarId(null);
+    };
+
+    document.addEventListener("mousedown", handleOutsidePress, true);
+    document.addEventListener("touchstart", handleOutsidePress, true);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsidePress, true);
+      document.removeEventListener("touchstart", handleOutsidePress, true);
+    };
+  }, [tooltipOpen, hideTooltip]);
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteSleepEntry,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["history"] });
+      hideTooltip();
+      setHighlightedBarId(null);
+    },
+    onError: (err) => {
+      error("Failed to delete sleep entry", {
+        description: err instanceof Error ? err.message : "Unknown error",
+      });
+    },
+  });
+
+  const handleEditClick = (bar: SleepBar) => {
+    openEdit(bar.entry, bar.allowActiveToggle);
+  };
+
+  const handleDeleteClick = (bar: SleepBar) => {
+    if (!sheetUrl || !bar.entry.sheetRowIndex) {
+      error("Missing sheet row for deletion");
+      return;
+    }
+    if (!window.confirm("Delete this sleep entry?")) {
+      return;
+    }
+    deleteMutation.mutate({ sheetUrl, rowIndex: bar.entry.sheetRowIndex });
   };
 
   // Auto-scroll to today on initial mount
@@ -305,6 +392,47 @@ export function ResponsiveSleepTimeline({
       }, 100);
     }
   }, [todayIndex, margin.left]);
+
+  useLayoutEffect(() => {
+    if (tooltipOpen && tooltipRef.current) {
+      setTooltipSize({
+        width: tooltipRef.current.offsetWidth,
+        height: tooltipRef.current.offsetHeight,
+      });
+    }
+  }, [tooltipOpen, tooltipData]);
+
+  const tooltipLeftClamped = (() => {
+    if (tooltipLeft === undefined || tooltipLeft === null) {
+      return tooltipLeft;
+    }
+
+    const container = scrollContainerRef.current;
+    if (!container || tooltipSize.width === 0) {
+      return tooltipLeft;
+    }
+
+    const containerWidth = container.offsetWidth;
+    const scrollLeft = container.scrollLeft;
+    const centerInView = tooltipLeft - scrollLeft;
+    const maxLeft = Math.max(TOOLTIP_PADDING, containerWidth - tooltipSize.width - TOOLTIP_PADDING);
+    const clampedLeft = Math.min(
+      Math.max(centerInView - tooltipSize.width / 2, TOOLTIP_PADDING),
+      maxLeft
+    );
+
+    return clampedLeft + scrollLeft;
+  })();
+
+  const tooltipTopClamped = (() => {
+    if (tooltipTop === undefined || tooltipTop === null) {
+      return tooltipTop;
+    }
+    if (tooltipSize.height === 0) {
+      return tooltipTop;
+    }
+    return Math.max(TOOLTIP_PADDING, tooltipTop - tooltipSize.height - TOOLTIP_PADDING);
+  })();
 
   if (allDayStats.length === 0) {
     return (
@@ -332,6 +460,7 @@ export function ResponsiveSleepTimeline({
       >
         <svg width={svgWidth} height={height} ref={containerRef}>
           <Group left={margin.left} top={margin.top}>
+
             {/* Date headers */}
             {allDayStats.map((dayStat, dayIndex) => {
               const x = dayScale(dayIndex.toString()) || 0;
@@ -425,7 +554,15 @@ export function ResponsiveSleepTimeline({
                 />
               );
             })}
-
+            {/* Current time indicator (red line) */}
+            {showCurrentTimeIndicator && currentTimeY >= 0 && currentTimeY <= innerHeight && (
+              <Line
+                from={{ x: 0, y: currentTimeY }}
+                to={{ x: innerWidth, y: currentTimeY }}
+                stroke="#ef4444"
+                strokeWidth={2}
+              />
+            )}
             {/* Sleep bars */}
             {sleepBars.map((bar) => {
               const x = dayScale(bar.dayIndex.toString()) || 0;
@@ -448,23 +585,18 @@ export function ResponsiveSleepTimeline({
                   stroke={bar.isActive ? "#9fb1ab" : isHighlighted ? "#f59e0b" : "transparent"}
                   strokeWidth={bar.isActive || isHighlighted ? 2 : 0}
                   rx={2}
+                  data-tooltip-anchor="sleep"
                   onMouseMove={(event) => handleBarInteraction(event, bar, x, columnWidth)}
                   onMouseLeave={handleBarLeave}
+                  onTouchStart={(event) => handleBarInteraction(event, bar, x, columnWidth)}
+                  onTouchMove={(event) => handleBarInteraction(event, bar, x, columnWidth)}
                   style={{ cursor: "pointer" }}
                   opacity={isHighlighted ? 0.9 : 1}
                 />
               );
             })}
 
-            {/* Current time indicator (red line) */}
-            {showCurrentTimeIndicator && currentTimeY >= 0 && currentTimeY <= innerHeight && (
-              <Line
-                from={{ x: 0, y: currentTimeY }}
-                to={{ x: innerWidth, y: currentTimeY }}
-                stroke="#ef4444"
-                strokeWidth={2}
-              />
-            )}
+
           </Group>
 
           {/* Bar Chart Section */}
@@ -504,8 +636,11 @@ export function ResponsiveSleepTimeline({
               return (
                 <g
                   key={`bar-group-${dayIndex}`}
+                  data-tooltip-anchor="daily"
                   onMouseMove={(event) => handleTotalBarInteraction(event, dayStat, x)}
                   onMouseLeave={handleTotalBarLeave}
+                  onTouchStart={(event) => handleTotalBarInteraction(event, dayStat, x)}
+                  onTouchMove={(event) => handleTotalBarInteraction(event, dayStat, x)}
                   style={{ cursor: "pointer" }}
                 >
                   {/* Night sleep bar (bottom, darker) */}
@@ -615,47 +750,84 @@ export function ResponsiveSleepTimeline({
       {/* Tooltip */}
       {tooltipOpen && tooltipData && (
         <TooltipInPortal
-          top={tooltipTop}
-          left={tooltipLeft}
-          style={{ ...defaultStyles, backgroundColor: "" }}
-          className="z-1000 bg-gray-200 dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700"
+          top={tooltipTopClamped}
+          left={tooltipLeftClamped}
+          offsetLeft={0}
+          offsetTop={0}
+          style={{ ...defaultStyles, backgroundColor: "transparent", pointerEvents: "auto" }}
+          className="z-10"
         >
-          {"type" in tooltipData && tooltipData.type === "daily" ? (
-            <div className="text-sm space-y-1">
-              <div className="font-semibold text-gray-900 dark:text-gray-100">
-                {tooltipData.date.format("MMM D, YYYY")}
+          <div
+            ref={tooltipRef}
+            className="bg-gray-200 dark:bg-gray-800 rounded-lg shadow-lg p-3 border border-gray-200 dark:border-gray-700"
+            onMouseEnter={() => {
+              if (tooltipTimeout.current) {
+                clearTimeout(tooltipTimeout.current);
+              }
+            }}
+            onMouseLeave={handleBarLeave}
+          >
+            {"type" in tooltipData && tooltipData.type === "daily" ? (
+              <div className="text-sm space-y-1">
+                <div className="font-semibold text-gray-900 dark:text-gray-100">
+                  {tooltipData.date.format("MMM D, YYYY")}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  Day: {formatDurationHHMM(tooltipData.dayMinutes)}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  Night: {formatDurationHHMM(tooltipData.nightMinutes)}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300 font-semibold">
+                  Total: {formatDurationHHMM(tooltipData.totalMinutes)}
+                </div>
               </div>
-              <div className="text-gray-700 dark:text-gray-300">
-                Day: {formatDurationHHMM(tooltipData.dayMinutes)}
+            ) : (
+              <div className="text-sm space-y-1">
+                <div className="font-semibold text-gray-900 dark:text-gray-100">
+                  {"cycle" in tooltipData && tooltipData.cycle} Sleep
+                  {"isActive" in tooltipData && tooltipData.isActive && " (Active)"}
+                </div>
+                <div className="text-gray-600 dark:text-gray-400 text-xs">
+                  {"logicalDate" in tooltipData && dayjs(tooltipData.logicalDate).format("MMM D, YYYY")}
+                </div>
+                <div className="text-gray-600 dark:text-gray-400">
+                  {"startTime" in tooltipData && "endTime" in tooltipData &&
+                    `${tooltipData.startTime} → ${tooltipData.endTime}`}
+                </div>
+                <div className="text-gray-700 dark:text-gray-300">
+                  {"durationMinutes" in tooltipData &&
+                    `Duration: ${formatDuration(tooltipData.durationMinutes)}`}
+                </div>
+                {"entry" in tooltipData ? (
+                  <div className="flex items-center gap-2 pt-2">
+                    <Button
+                      small
+                      outline
+                      rounded
+                      className="text-red-600 border-red-600 dark:border-red-800"
+                      onClick={() => handleDeleteClick(tooltipData)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      small
+                      outline
+                      rounded
+                      onClick={() => handleEditClick(tooltipData)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+
+                  </div>
+                ) : null}
               </div>
-              <div className="text-gray-700 dark:text-gray-300">
-                Night: {formatDurationHHMM(tooltipData.nightMinutes)}
-              </div>
-              <div className="text-gray-700 dark:text-gray-300 font-semibold">
-                Total: {formatDurationHHMM(tooltipData.totalMinutes)}
-              </div>
-            </div>
-          ) : (
-            <div className="text-sm space-y-1">
-              <div className="font-semibold text-gray-900 dark:text-gray-100">
-                {"cycle" in tooltipData && tooltipData.cycle} Sleep
-                {"isActive" in tooltipData && tooltipData.isActive && " (Active)"}
-              </div>
-              <div className="text-gray-600 dark:text-gray-400 text-xs">
-                {"logicalDate" in tooltipData && dayjs(tooltipData.logicalDate).format("MMM D, YYYY")}
-              </div>
-              <div className="text-gray-600 dark:text-gray-400">
-                {"startTime" in tooltipData && "endTime" in tooltipData &&
-                  `${tooltipData.startTime} → ${tooltipData.endTime}`}
-              </div>
-              <div className="text-gray-700 dark:text-gray-300">
-                {"durationMinutes" in tooltipData &&
-                  `Duration: ${formatDuration(tooltipData.durationMinutes)}`}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </TooltipInPortal>
       )}
+
     </div>
   );
 }
