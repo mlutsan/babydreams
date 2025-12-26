@@ -50,23 +50,6 @@ export function EatModal({ opened, onClose }: EatModalProps) {
     }
   }, [opened]);
 
-  // Handle touch/click anywhere on slider track
-  const handleSliderInteraction = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const rect = target.getBoundingClientRect();
-
-    let clientX: number;
-    if ("touches" in e) {
-      clientX = e.touches[0]?.clientX || 0;
-    } else {
-      clientX = e.clientX;
-    }
-
-    const x = clientX - rect.left;
-    const percentage = Math.max(0, Math.min(1, x / rect.width));
-    const newValue = Math.round(percentage * 200 / 10) * 10; // Round to nearest 10
-    setVolume(newValue);
-  };
 
   const handleConfirm = () => {
     if (!selectedTime || !sheetUrl) {
