@@ -9,7 +9,9 @@ import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useSleepModal } from "~/hooks/useSleepModal";
+import { useSleepForecast } from "~/hooks/useSleepForecast";
 import dayjs from "dayjs";
+import { SleepForecastCard, type ExpectedSleep, type Mood, type SleepState } from "~/components/mobile/SleepForecast";
 
 export const Route = createFileRoute("/")({
   component: Home,
@@ -20,6 +22,7 @@ function Home() {
   const babyName = useAtomValue(babyNameAtom);
   const [now, setNow] = useState(dayjs());
   const { openTrack } = useSleepModal();
+  const { forecast } = useSleepForecast();
 
   // Use the shared sleep history hook
   const { todayStat, sleepState, isLoading, allStats } = useTodaySleepStat();
@@ -133,6 +136,103 @@ function Home() {
   const isSleeping = sleepState?.isActive || false;
   const displayName = babyName || "Baby";
 
+  const expectedSleep = useMemo<ExpectedSleep | null>(() => {
+    const median = forecast.predictedSleepDurationMinutes;
+    const min = forecast.predictedSleepDurationRange.shortest;
+    const max = forecast.predictedSleepDurationRange.longest;
+
+    if (median === null && min === null && max === null) {
+      return null;
+    }
+
+    const fallback = median ?? min ?? max;
+    if (fallback === null) {
+      return null;
+    }
+
+    const medianVal = Math.round(median ?? fallback);
+    const minVal = Math.round(min ?? fallback);
+    const maxVal = Math.round(max ?? fallback);
+
+    const minMin = Math.min(minVal, medianVal, maxVal);
+    const maxMin = Math.max(minVal, medianVal, maxVal);
+    const medianMin = Math.min(Math.max(medianVal, minMin), maxMin);
+
+    return { medianMin, minMin, maxMin };
+  }, [
+    forecast.predictedSleepDurationMinutes,
+    forecast.predictedSleepDurationRange.shortest,
+    forecast.predictedSleepDurationRange.longest,
+  ]);
+
+  const forecastCard = useMemo(() => {
+    if (!expectedSleep) {
+      return null;
+    }
+
+    if (sleepState?.isActive) {
+      const lastEntry = todayStat?.entries.at(-1);
+      if (!lastEntry || lastEntry.endTime !== null) {
+        return null;
+      }
+
+      const sleepStart = lastEntry.realDatetime.toDate();
+      const minEnd = new Date(sleepStart.getTime() + expectedSleep.minMin * 60_000);
+      const maxEnd = new Date(sleepStart.getTime() + expectedSleep.maxMin * 60_000);
+      const nowDate = now.toDate();
+
+      const state: SleepState =
+        nowDate > maxEnd
+          ? "overdue"
+          : nowDate >= minEnd
+            ? "wakingSoon"
+            : "sleeping";
+
+      return {
+        model: {
+          mode: "sleeping" as const,
+          state,
+          sleepStart,
+          expectedSleep,
+        },
+        title: "Sleeping",
+        showWindowLine: undefined,
+      };
+    }
+
+    if (forecast.zone === "unknown" || !forecast.predictedSleepStart) {
+      return null;
+    }
+
+    const earliest = forecast.predictedSleepStartRange.earliest ?? forecast.predictedSleepStart;
+    const latest = forecast.predictedSleepStartRange.latest ?? forecast.predictedSleepStart;
+    if (!earliest || !latest) {
+      return null;
+    }
+
+    const mood: Mood =
+      forecast.zone === "green"
+        ? "active"
+        : forecast.zone === "yellow"
+          ? "sleepSoon"
+          : "overrun";
+
+    return {
+      model: {
+        mode: "awake" as const,
+        mood,
+        earliest: earliest.toDate(),
+        target: forecast.predictedSleepStart.toDate(),
+        latest: latest.toDate(),
+        expectedSleep,
+      },
+      title: "Awake Window",
+      showWindowLine: Boolean(
+        forecast.predictedSleepStartRange.earliest && forecast.predictedSleepStartRange.latest
+      ),
+    };
+  }, [expectedSleep, forecast, now, sleepState?.isActive, todayStat]);
+
   if (isLoading) {
     return (
       <Block className="text-center py-8">
@@ -210,6 +310,20 @@ function Home() {
         </Button>
         {/* </Card> */}
       </Block>
+
+      {forecastCard ? (
+        <SleepForecastCard
+          model={forecastCard.model}
+          title={forecastCard.title}
+          showWindowLine={forecastCard.showWindowLine}
+        />
+      ) : (
+        <Block strong inset>
+          <div className="text-sm text-gray-500">
+            {isSleeping ? "Sleeping now" : "Not enough data for forecast yet"}
+          </div>
+        </Block>
+      )}
 
       {/* Today's Stats */}
       <BlockTitle>Today</BlockTitle>

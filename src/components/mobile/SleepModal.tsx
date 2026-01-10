@@ -264,7 +264,7 @@ export function SleepModal({
   const babyName = useAtomValue(babyNameAtom);
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const cycleSettings = useAtomValue(cycleSettingsAtom);
-  const { todayStat } = useTodaySleepStat();
+  const { todayStat, allStats } = useTodaySleepStat();
   const mutation = useSleepMutation();
   const queryClient = useQueryClient();
   const { error } = useToast();
@@ -381,6 +381,8 @@ export function SleepModal({
       return;
     }
 
+    const lastEntryDate = allStats?.at(-1)?.entries.at(-1)?.date ?? null;
+
     mutation.mutate(
       {
         sheetUrl,
@@ -388,6 +390,8 @@ export function SleepModal({
         cycle: trackCycle,
         what: isSleeping ? "Awake" : "Sleep",
         todayStat: todayStat || null,
+        now: dayjs(),
+        lastEntryDate,
       },
       {
         onSuccess: onClose,

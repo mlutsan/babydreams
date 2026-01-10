@@ -54,13 +54,17 @@ function Eat() {
     refetchInterval: 60000, // Refresh every minute
   });
 
-  // Find today's stat using sleep's logical date
+  // Find today's stat, preferring calendar-today when entries exist
   const todayStat = useMemo(() => {
     if (!allStats || allStats.length === 0) {
       return null;
     }
 
     const now = dayjs();
+    const calendarToday = allStats.find((stat) => stat.date.isSame(now, "day"));
+    if (calendarToday) {
+      return calendarToday;
+    }
 
     const todayLogicalDate =
       getCycleDateForDatetime(now, allSleepStats, now).format("YYYY-MM-DD");
@@ -186,7 +190,11 @@ function Eat() {
 
       {/* Weekly Trends & Insights */}
       {allStats && allStats.length > 0 && (
-        <EatStats dailyStats={allStats} />
+        <EatStats
+          dailyStats={allStats}
+          sleepStats={allSleepStats}
+          todayDate={todayStat?.date}
+        />
       )}
 
       {/* Meal Overview Chart */}
@@ -194,7 +202,10 @@ function Eat() {
         <>
           {/* <BlockTitle>Meal History</BlockTitle> */}
           <Block strong inset>
-            <EatOverviewChart dailyStats={allStats} sleepStats={allSleepStats} />
+            <EatOverviewChart
+              dailyStats={allStats}
+              todayDate={todayStat?.date}
+            />
           </Block>
         </>
       )}

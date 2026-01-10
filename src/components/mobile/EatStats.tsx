@@ -7,9 +7,13 @@ import { useMemo } from "react";
 import dayjs from "dayjs";
 import { Block, BlockTitle } from "konsta/react";
 import type { DailyEatStat } from "~/lib/eat-service";
+import type { DailyStat } from "~/types/sleep";
+import { EatStepChart } from "~/components/mobile/EatStepChart";
 
 interface EatStatsProps {
   dailyStats: DailyEatStat[];
+  sleepStats?: DailyStat[];
+  todayDate?: dayjs.Dayjs;
 }
 
 interface WindowStats {
@@ -67,11 +71,11 @@ const TIME_BUCKETS: Array<{
   endHour: number;
   wraps?: boolean;
 }> = [
-  { key: "morning", label: "Morning", startHour: 6, endHour: 11 },
-  { key: "afternoon", label: "Afternoon", startHour: 12, endHour: 17 },
-  { key: "evening", label: "Evening", startHour: 18, endHour: 21 },
-  { key: "night", label: "Night", startHour: 22, endHour: 5, wraps: true },
-];
+    { key: "morning", label: "Morning", startHour: 6, endHour: 11 },
+    { key: "afternoon", label: "Afternoon", startHour: 12, endHour: 17 },
+    { key: "evening", label: "Evening", startHour: 18, endHour: 21 },
+    { key: "night", label: "Night", startHour: 22, endHour: 5, wraps: true },
+  ];
 
 const DAY_NIGHT_SPLIT = { dayStart: 6, dayEnd: 18 }; // 06:00-17:59 day, otherwise night
 
@@ -105,10 +109,10 @@ function describeConsistency(volumes: number[]): string {
   return "Quite variable";
 }
 
-export function EatStats({ dailyStats }: EatStatsProps) {
+export function EatStats({ dailyStats, sleepStats, todayDate }: EatStatsProps) {
   const stats = useMemo(() => {
     const now = dayjs();
-    const logicalToday = dailyStats[0]?.date ?? now.startOf("day");
+    const logicalToday = todayDate ?? dailyStats[0]?.date ?? now.startOf("day");
     const todayStart = logicalToday.startOf("day");
     const nowEnd = now.endOf("day");
     const rollingStart = todayStart.subtract(6, "day"); // 7-day window including today
@@ -209,7 +213,7 @@ export function EatStats({ dailyStats }: EatStatsProps) {
       consistencyLabel,
       avgMealsPerDayLast7,
     };
-  }, [dailyStats]);
+  }, [dailyStats, todayDate]);
 
   const {
     currentWindow,
@@ -289,6 +293,15 @@ export function EatStats({ dailyStats }: EatStatsProps) {
       <BlockTitle>Today</BlockTitle>
       <Block strong inset className="space-y-3">
 
+        {dailyStats.length > 0 && (
+          <div className="mt-4">
+            <EatStepChart
+              dailyStats={dailyStats}
+              sleepStats={sleepStats}
+              todayDate={todayDate}
+            />
+          </div>
+        )}
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
             <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Per Meal</div>

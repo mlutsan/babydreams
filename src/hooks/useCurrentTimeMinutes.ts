@@ -1,17 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs, { type Dayjs } from "dayjs";
 import type { DailyStat } from "~/types/sleep";
+import { getTimeOfDayMinutes, normalizeMinutesSinceStart } from "~/lib/date-utils";
 
-const MINUTES_PER_DAY = 24 * 60;
-
-function getMinStartDatetime(stats?: DailyStat[]): Dayjs | null {
+export function getMinStartDatetime(stats?: DailyStat[]): Dayjs | null {
   if (!stats || stats.length === 0) {
     return null;
   }
 
   return stats.reduce((min, stat) => {
-    return stat.startDatetime.isBefore(min) ? stat.startDatetime : min;
+    const minMinutes = getTimeOfDayMinutes(min);
+    const statMinutes = getTimeOfDayMinutes(stat.startDatetime);
+
+    if (statMinutes < minMinutes) {
+      return stat.startDatetime;
+    }
+
+    if (statMinutes === minMinutes && stat.startDatetime.isBefore(min)) {
+      return stat.startDatetime;
+    }
+
+    return min;
   }, stats[0].startDatetime);
+}
+
+export function computeCurrentTimeMinutes(
+  now: Dayjs,
+  referenceStartMinutes: number | null
+) {
+  const currentMinutes = getTimeOfDayMinutes(now);
+  if (referenceStartMinutes === null) {
+    return currentMinutes;
+  }
+
+  return normalizeMinutesSinceStart(currentMinutes, referenceStartMinutes);
 }
 
 export function useCurrentTimeMinutes(sleepStats?: DailyStat[]) {
@@ -31,18 +53,11 @@ export function useCurrentTimeMinutes(sleepStats?: DailyStat[]) {
       return null;
     }
 
-    return referenceStart.hour() * 60 + referenceStart.minute();
+    return getTimeOfDayMinutes(referenceStart);
   }, [referenceStart]);
 
   const currentTimeMinutes = useMemo(() => {
-    const currentMinutes = now.hour() * 60 + now.minute();
-    if (referenceStartMinutes === null) {
-      return currentMinutes;
-    }
-
-    return currentMinutes < referenceStartMinutes
-      ? currentMinutes + MINUTES_PER_DAY
-      : currentMinutes;
+    return computeCurrentTimeMinutes(now, referenceStartMinutes);
   }, [now, referenceStartMinutes]);
 
   return {

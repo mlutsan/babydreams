@@ -9,7 +9,7 @@ import { parseRow } from "~/lib/sleep-utils";
 import { computeDailyStats } from "~/lib/sleep-model";
 import { getSheetValues } from "~/server/proxy";
 import { formatDuration } from "~/lib/date-utils";
-import type { SleepEntry, DailyStat as DailyStatType } from "~/types/sleep";
+import type { DailyStat, SleepEntry } from "~/types/sleep";
 
 const SLEEP_SHEET = "Sleep";
 
@@ -36,8 +36,6 @@ export type DayHistory = {
   nightCycleDurationMinutes: number; // Total duration of night cycle
 };
 
-// Re-export DailyStat from shared types for backward compatibility
-export type DailyStat = DailyStatType;
 
 /**
  * Get all sleep history grouped by logical days

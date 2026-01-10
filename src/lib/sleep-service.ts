@@ -42,8 +42,10 @@ export async function toggleSleep(params: {
   cycle: "Day" | "Night";
   what: "Sleep" | "Awake";
   todayStat: DailyStat | null;
+  now: dayjs.Dayjs;
+  lastEntryDate?: dayjs.Dayjs | null;
 }): Promise<{ success: boolean; action: "started" | "ended"; }> {
-  const { sheetUrl, time, cycle, what, todayStat } = params;
+  const { sheetUrl, time, cycle, what, todayStat, now, lastEntryDate } = params;
 
   // Client-side validation
   if (!["Day", "Night"].includes(cycle)) {
@@ -54,8 +56,6 @@ export async function toggleSleep(params: {
   }
 
   const range = `${SLEEP_SHEET}!A:F`;
-  const today = dayjs();
-
   try {
     // Determine if there's an active sleep session from todayStat
     const activeEntry = todayStat?.hasActiveSleep
@@ -94,12 +94,9 @@ export async function toggleSleep(params: {
       // Ensure headers exist
       await ensureSleepHeaders(sheetUrl);
 
-      // Use last entry date from todayStat if available, otherwise use today
-      const lastDate = todayStat?.entries.length
-        ? todayStat.entries[todayStat.entries.length - 1].date
-        : undefined;
-
-      const newDate = calculateDateForCycle(cycle, lastDate || today, today);
+      // Use the last entry date from history if available, otherwise fall back to now.
+      const lastDate = lastEntryDate ?? todayStat?.entries.at(-1)?.date ?? now;
+      const newDate = calculateDateForCycle(cycle, lastDate, now);
       const addedDate = getTimestamp();
 
       const newEntry = [
@@ -127,9 +124,6 @@ export async function toggleSleep(params: {
     );
   }
 }
-
-// Keep old function name for backward compatibility during migration
-export const addSleepEntry = toggleSleep;
 
 export async function addSleepEntryManual(params: {
   sheetUrl: string;

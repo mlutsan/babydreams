@@ -3,33 +3,77 @@
  * Self-contained: handles mutation internally
  */
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAtomValue } from "jotai";
-import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link } from "konsta/react";
+import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link, Segmented, SegmentedButton } from "konsta/react";
 import { X } from "lucide-react";
-import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
+import { babyNameAtom, cycleSettingsAtom, sheetUrlAtom } from "~/lib/atoms";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useEatMutation } from "~/hooks/useEatMutation";
 import dayjs from "dayjs";
-import { addMinutesToTime, getTimeAgoFromManualInput, getCycleDateForDatetime } from "~/lib/date-utils";
+import {
+  addMinutesToTime,
+  getTimeAgoFromManualInput,
+  getCycleDateForDatetime,
+  MINUTES_PER_DAY,
+  timeToMinutes,
+} from "~/lib/date-utils";
 
 interface EatModalProps {
   opened: boolean;
   onClose: () => void;
 }
 
+type MealDayOption = "today" | "yesterday";
+
+function resolveSelectedDatetime(time: string): dayjs.Dayjs {
+  const [hours, minutes] = time.split(":").map(Number);
+  let datetime = dayjs().hour(hours).minute(minutes).second(0);
+
+  // Tracking is always about the past.
+  // If computed datetime is significantly in the future (>60 min grace), it must be yesterday.
+  // Example: now is 00:05, user enters 23:55 → should be yesterday at 23:55
+  if (datetime.isAfter(dayjs().add(60, "minute"))) {
+    datetime = datetime.subtract(1, "day");
+  }
+
+  return datetime;
+}
+
 export function EatModal({ opened, onClose }: EatModalProps) {
   const babyName = useAtomValue(babyNameAtom);
+  const cycleSettings = useAtomValue(cycleSettingsAtom);
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const { allStats: allSleepStats } = useTodaySleepStat();
   const mutation = useEatMutation();
 
   const [volume, setVolume] = useState(100); // Default 100ml
   const [selectedTime, setSelectedTime] = useState("");
+  const [cycleDay, setCycleDay] = useState<MealDayOption>("today");
+  const [cycleDayManual, setCycleDayManual] = useState(false);
   const timeInputRef = useRef<HTMLInputElement>(null);
+  const initializedRef = useRef(false);
+  const daySelectionWindowMinutes = 120;
+
+  const hasCalendarTodayStat = useMemo(() => {
+    if (!allSleepStats || allSleepStats.length === 0) {
+      return false;
+    }
+    const today = dayjs().format("YYYY-MM-DD");
+    return allSleepStats.some((stat) => stat.logicalDate === today);
+  }, [allSleepStats]);
 
   const displayName = babyName || "baby";
   const modalTitle = `How much did ${displayName} eat?`;
+
+  const showDaySelection = useMemo(() => {
+    const timeValue = selectedTime || dayjs().format("HH:mm");
+    const selectedMinutes = timeToMinutes(timeValue);
+    const dayStartMinutes = timeToMinutes(cycleSettings.dayStart);
+    const diff = Math.abs(selectedMinutes - dayStartMinutes);
+    const distance = Math.min(diff, MINUTES_PER_DAY - diff);
+    return distance <= daySelectionWindowMinutes && !hasCalendarTodayStat;
+  }, [selectedTime, cycleSettings.dayStart, hasCalendarTodayStat]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -43,30 +87,54 @@ export function EatModal({ opened, onClose }: EatModalProps) {
     };
   }, [opened]);
 
-  // Reset time when opening
+  // Reset time and cycle day when opening
   useEffect(() => {
-    if (opened) {
-      setSelectedTime(dayjs().format("HH:mm"));
+    if (!opened) {
+      initializedRef.current = false;
+      return;
     }
-  }, [opened]);
 
+    if (initializedRef.current) {
+      return;
+    }
+
+    const now = dayjs();
+    setSelectedTime(now.format("HH:mm"));
+    setCycleDayManual(false);
+
+    const defaultCycleDate = getCycleDateForDatetime(now, allSleepStats, now);
+    setCycleDay(defaultCycleDate.isSame(now, "day") ? "today" : "yesterday");
+    initializedRef.current = true;
+  }, [opened, allSleepStats]);
+
+  useEffect(() => {
+    if (!opened || showDaySelection || !cycleDayManual) {
+      return;
+    }
+    setCycleDayManual(false);
+  }, [opened, showDaySelection, cycleDayManual]);
+
+  useEffect(() => {
+    if (!opened || cycleDayManual || !selectedTime) {
+      return;
+    }
+
+    const now = dayjs();
+    const datetime = resolveSelectedDatetime(selectedTime);
+    const defaultCycleDate = getCycleDateForDatetime(datetime, allSleepStats, now);
+    setCycleDay(defaultCycleDate.isSame(now, "day") ? "today" : "yesterday");
+  }, [opened, cycleDayManual, selectedTime, allSleepStats]);
 
   const handleConfirm = () => {
     if (!selectedTime || !sheetUrl) {
       return;
     }
 
-    const [hours, minutes] = selectedTime.split(":").map(Number);
-    let datetime = dayjs().hour(hours).minute(minutes).second(0);
+    const datetime = resolveSelectedDatetime(selectedTime);
 
-    // Tracking is always about the past.
-    // If computed datetime is significantly in the future (>60 min grace), it must be yesterday.
-    // Example: now is 00:05, user enters 23:55 → should be yesterday at 23:55
-    if (datetime.isAfter(dayjs().add(60, "minute"))) {
-      datetime = datetime.subtract(1, "day");
-    }
-
-    const cycleDate = getCycleDateForDatetime(datetime, allSleepStats);
+    const now = dayjs();
+    const cycleDate =
+      cycleDay === "today" ? now.startOf("day") : now.subtract(1, "day").startOf("day");
 
     mutation.mutate(
       {
@@ -177,6 +245,33 @@ export function EatModal({ opened, onClose }: EatModalProps) {
               <Button outline rounded small onClick={() => handleTimeAdjustment(10)}>+10 min</Button>
             </div>
           </div>
+
+          {/* Day Selection */}
+          {showDaySelection && (
+            <div className="space-y-2">
+              <div className="text-sm opacity-70 text-center">Log this meal for</div>
+              <Segmented rounded strong>
+                <SegmentedButton
+                  active={cycleDay === "today"}
+                  onClick={() => {
+                    setCycleDay("today");
+                    setCycleDayManual(true);
+                  }}
+                >
+                  Today
+                </SegmentedButton>
+                <SegmentedButton
+                  active={cycleDay === "yesterday"}
+                  onClick={() => {
+                    setCycleDay("yesterday");
+                    setCycleDayManual(true);
+                  }}
+                >
+                  Yesterday
+                </SegmentedButton>
+              </Segmented>
+            </div>
+          )}
 
           {/* Confirm Button */}
           <div className="mt-8">

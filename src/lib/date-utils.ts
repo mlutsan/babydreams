@@ -11,6 +11,8 @@ import type { DailyStat } from "~/types/sleep";
 /**
  * Convert minutes to HH:mm duration format (e.g., "02:15")
  */
+export const MINUTES_PER_DAY = 24 * 60;
+
 export function formatDuration(minutes: number): string {
   if (minutes < 0) {
     return "00:00";
@@ -202,6 +204,21 @@ export function getTimeAgo(minutesAgo: number): string {
 export function timeToMinutes(time: string): number {
   const [hours, minutes] = time.split(":").map(Number);
   return hours * 60 + minutes;
+}
+
+/**
+ * Get minutes since midnight for a Dayjs datetime.
+ */
+export function getTimeOfDayMinutes(datetime: Dayjs): number {
+  return datetime.hour() * 60 + datetime.minute();
+}
+
+/**
+ * Normalize minutes into a logical day that can span past midnight.
+ * If the time is before the logical start, it is treated as next day.
+ */
+export function normalizeMinutesSinceStart(timeMinutes: number, startMinutes: number): number {
+  return timeMinutes < startMinutes ? timeMinutes + MINUTES_PER_DAY : timeMinutes;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { addSleepEntry } from "~/lib/sleep-service";
+import { toggleSleep } from "~/lib/sleep-service";
 import { useToast } from "~/hooks/useToast";
 
 /**
@@ -11,7 +11,7 @@ export function useSleepMutation() {
   const { error } = useToast();
 
   return useMutation({
-    mutationFn: addSleepEntry,
+    mutationFn: toggleSleep,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["history"] });
     },
