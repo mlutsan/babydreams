@@ -7,6 +7,7 @@ import { atom } from "jotai";
 import type { Dayjs } from "dayjs";
 import type { SleepEntry } from "~/types/sleep";
 import { atomWithStorage } from "jotai/utils";
+import { getOverrideNow, getUiNow } from "~/lib/time-override";
 
 /**
  * Auth state atom - tracks Google authentication status
@@ -86,6 +87,39 @@ export interface ToastMessage {
 
 export const toastAtom = atom<ToastMessage | null>(null);
 export const toastOpenAtom = atom<boolean>(false);
+
+/**
+ * Global minute tick for time-based UI updates.
+ * Updates once per minute, driven by a 1s internal timer.
+ */
+export const minuteTickAtom = atom(getUiNow());
+
+minuteTickAtom.onMount = (set) => {
+  const overrideNow = getOverrideNow();
+  if (overrideNow) {
+    set(overrideNow);
+    return () => {};
+  }
+
+  let lastMinuteKey = Math.floor(Date.now() / 60000);
+
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  set(getUiNow());
+  const intervalId = window.setInterval(() => {
+    const minuteKey = Math.floor(Date.now() / 60000);
+    if (minuteKey !== lastMinuteKey) {
+      lastMinuteKey = minuteKey;
+      set(getUiNow());
+    }
+  }, 1000);
+
+  return () => {
+    window.clearInterval(intervalId);
+  };
+};
 
 /**
  * Cycle settings atom - defines when day/night cycles start

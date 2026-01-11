@@ -4,11 +4,11 @@
  * NEW STRUCTURE: Only tracks sleep (no wake entries)
  */
 
-import dayjs from "dayjs";
 import { parseRow } from "~/lib/sleep-utils";
 import { computeDailyStats } from "~/lib/sleep-model";
 import { getSheetValues } from "~/server/proxy";
 import { formatDuration } from "~/lib/date-utils";
+import { systemClock } from "~/lib/clock";
 import type { DailyStat, SleepEntry } from "~/types/sleep";
 
 const SLEEP_SHEET = "Sleep";
@@ -65,7 +65,7 @@ export async function getHistory(sheetUrl: string): Promise<DailyStat[]> {
       }
     }
 
-    const now = dayjs();
+    const now = systemClock.now();
     return computeDailyStats(allEntries, { now });
   } catch (error) {
     throw new Error(

@@ -2,10 +2,11 @@
  * Pure forecast model for day sleep windows.
  */
 
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import { computeDailyStats } from "~/lib/sleep-model";
 import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
+import { systemClock } from "~/lib/clock";
 
 export type SleepForecastZone = "green" | "yellow" | "red" | "unknown";
 
@@ -387,7 +388,7 @@ export function computeSleepForecast(
   entries: SleepEntry[],
   options: SleepForecastOptions = {}
 ): SleepForecast {
-  const now = options.now ?? dayjs();
+  const now = options.now ?? systemClock.now();
   const windowDays = options.windowDays ?? 7;
   const minSamples = options.minSamples ?? 5;
 

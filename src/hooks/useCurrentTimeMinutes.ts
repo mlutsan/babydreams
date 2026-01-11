@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
-import dayjs, { type Dayjs } from "dayjs";
+import { useMemo } from "react";
+import { type Dayjs } from "dayjs";
 import type { DailyStat } from "~/types/sleep";
 import { getTimeOfDayMinutes, normalizeMinutesSinceStart } from "~/lib/date-utils";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 
 export function getMinStartDatetime(stats?: DailyStat[]): Dayjs | null {
   if (!stats || stats.length === 0) {
@@ -37,15 +38,7 @@ export function computeCurrentTimeMinutes(
 }
 
 export function useCurrentTimeMinutes(sleepStats?: DailyStat[]) {
-  const [now, setNow] = useState(() => dayjs());
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNow(dayjs());
-    }, 60 * 1000);
-
-    return () => window.clearInterval(interval);
-  }, []);
+  const now = useMinuteTick();
 
   const referenceStart = useMemo(() => getMinStartDatetime(sleepStats), [sleepStats]);
   const referenceStartMinutes = useMemo(() => {

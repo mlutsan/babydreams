@@ -1,7 +1,7 @@
-import { useMemo, useState, useEffect } from "react";
-import dayjs from "dayjs";
+import { useMemo } from "react";
 import { useSleepHistory } from "~/hooks/useSleepHistory";
 import { computeSleepForecast } from "~/lib/sleep-forecast";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 
 export type UseSleepForecastOptions = {
   windowDays?: number;
@@ -10,15 +10,7 @@ export type UseSleepForecastOptions = {
 
 export function useSleepForecast(options: UseSleepForecastOptions = {}) {
   const { data, isLoading } = useSleepHistory();
-  const [now, setNow] = useState(() => dayjs());
-
-  useEffect(() => {
-    const interval = window.setInterval(() => {
-      setNow(dayjs());
-    }, 60 * 1000);
-
-    return () => window.clearInterval(interval);
-  }, []);
+  const now = useMinuteTick();
 
   const entries = useMemo(() => {
     if (!data) {

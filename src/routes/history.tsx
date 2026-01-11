@@ -18,6 +18,7 @@ import type { SleepEntry, DailyStat } from "~/types/sleep";
 import { HistoryDayCard } from "~/components/history/HistoryDayCard";
 import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
 import { useSleepModal } from "~/hooks/useSleepModal";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 
 export const Route = createFileRoute("/history")({
   component: History,
@@ -30,6 +31,7 @@ function History() {
   const [isHydrated, setIsHydrated] = useState(false);
   const [expandedDayIds, setExpandedDayIds] = useState<string[]>([]);
   const { openAdd, openEdit } = useSleepModal();
+  const now = useMinuteTick();
 
   // Wait for atoms to hydrate from storage
   useEffect(() => {
@@ -60,17 +62,17 @@ function History() {
   const daysToDisplay = useMemo(() => {
     const days: Array<{ logicalDate: string; stat?: DailyStat; }> = [];
     for (let i = 0; i < MAX_DAYS; i += 1) {
-      const logicalDate = dayjs().subtract(i, "day").format("YYYY-MM-DD");
+      const logicalDate = now.subtract(i, "day").format("YYYY-MM-DD");
       days.push({
         logicalDate,
         stat: statsByLogicalDate.get(logicalDate),
       });
     }
     return days;
-  }, [statsByLogicalDate]);
+  }, [statsByLogicalDate, now]);
 
   const mostRecentLogicalDate = daysToDisplay[0]?.logicalDate;
-  const windowStart = dayjs().subtract(MAX_DAYS - 1, "day").startOf("day");
+  const windowStart = now.subtract(MAX_DAYS - 1, "day").startOf("day");
   const hasOlderData = statsSorted.some((stat) =>
     dayjs(stat.logicalDate).isBefore(windowStart, "day")
   );
@@ -99,8 +101,6 @@ function History() {
       </Block>
     );
   }
-
-  const now = dayjs();
 
   const toggleExpanded = (dayId: string) => {
     setExpandedDayIds((prev) =>

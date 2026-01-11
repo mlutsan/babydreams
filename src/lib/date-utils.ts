@@ -3,9 +3,10 @@
  * Uses dayjs for reliable date/time operations
  */
 
-import dayjs, { Dayjs } from "dayjs";
+import type { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
 import type { DailyStat } from "~/types/sleep";
+import { systemClock } from "~/lib/clock";
 
 
 /**
@@ -62,29 +63,29 @@ export function getTimeAgoOptions(): Array<{ label: string; value: number; }> {
 /**
  * Get current time in HH:mm format
  */
-export function getCurrentTime(): string {
-  return dayjs().format("HH:mm");
+export function getCurrentTime(now: Dayjs = systemClock.now()): string {
+  return now.format("HH:mm");
 }
 
 /**
  * Get timestamp in YYYY-MM-DD HH:mm format
  */
-export function getTimestamp(): string {
-  return dayjs().format("YYYY-MM-DD HH:mm");
+export function getTimestamp(now: Dayjs = systemClock.now()): string {
+  return now.format("YYYY-MM-DD HH:mm");
 }
 
 /**
  * Get today's date in YYYY-MM-DD format
  */
-export function getTodayDate(): string {
-  return dayjs().format("YYYY-MM-DD");
+export function getTodayDate(now: Dayjs = systemClock.now()): string {
+  return now.format("YYYY-MM-DD");
 }
 
 /**
  * Get yesterday's date in YYYY-MM-DD format
  */
-export function getYesterdayDate(): string {
-  return dayjs().subtract(1, "day").format("YYYY-MM-DD");
+export function getYesterdayDate(now: Dayjs = systemClock.now()): string {
+  return now.subtract(1, "day").format("YYYY-MM-DD");
 }
 
 /**
@@ -94,7 +95,7 @@ export function getYesterdayDate(): string {
 export function getCycleDateForDatetime(
   datetime: Dayjs,
   sleepStats?: DailyStat[],
-  now: Dayjs = dayjs()
+  now: Dayjs = systemClock.now()
 ): Dayjs {
   if (!sleepStats || sleepStats.length === 0) {
     return datetime.startOf("day");
@@ -194,8 +195,8 @@ export function calculateLength(startTime: string, endTime: string): number {
 /**
  * Subtract minutes from current time and return HH:mm
  */
-export function getTimeAgo(minutesAgo: number): string {
-  return dayjs().subtract(minutesAgo, "minute").format("HH:mm");
+export function getTimeAgo(minutesAgo: number, now: Dayjs = systemClock.now()): string {
+  return now.subtract(minutesAgo, "minute").format("HH:mm");
 }
 
 /**
@@ -225,8 +226,10 @@ export function normalizeMinutesSinceStart(timeMinutes: number, startMinutes: nu
  * Calculate how many minutes have passed since a given HH:mm time today
  * If the time is in the future (crossed midnight), calculate properly
  */
-export function getMinutesSince(startTime: duration.Duration): number {
-  const now = dayjs();
+export function getMinutesSince(
+  startTime: duration.Duration,
+  now: Dayjs = systemClock.now()
+): number {
   const currentMinutes = now.hour() * 60 + now.minute();
   const startMinutes = timeToMinutes(startTime.format("HH:mm"));
 
@@ -257,9 +260,13 @@ export function formatTimeAgoLabel(minutesAgo: number): string {
  * Add minutes to a HH:mm time string
  * Handles wrapping around midnight
  */
-export function addMinutesToTime(time: string, minutes: number): string {
+export function addMinutesToTime(
+  time: string,
+  minutes: number,
+  now: Dayjs = systemClock.now()
+): string {
   const [hours, mins] = time.split(":").map(Number);
-  const date = dayjs().hour(hours).minute(mins).add(minutes, "minute");
+  const date = now.hour(hours).minute(mins).add(minutes, "minute");
   return date.format("HH:mm");
 }
 
@@ -276,12 +283,14 @@ export function subtractMinutesFromTime(time: string, minutes: number): string {
  * Returns positive number for past times, negative for future times
  * Handles midnight crossover (if time is in past but after midnight)
  */
-export function getTimeAgoFromManualInput(time: string): number {
+export function getTimeAgoFromManualInput(
+  time: string,
+  now: Dayjs = systemClock.now()
+): number {
   if (!time) {
     return 0;
   }
 
-  const now = dayjs();
   const currentMinutes = now.hour() * 60 + now.minute();
   const inputMinutes = timeToMinutes(time);
 

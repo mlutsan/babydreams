@@ -4,7 +4,8 @@
  */
 
 import { useMemo, useRef, useEffect } from "react";
-import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import { scaleLinear, scaleBand } from "@visx/scale";
 import { Bar, Line } from "@visx/shape";
 import { Group } from "@visx/group";
@@ -15,11 +16,11 @@ import type { DailyEatStat } from "~/lib/eat-service";
 
 interface EatOverviewChartProps {
   dailyStats: DailyEatStat[];
-  todayDate?: dayjs.Dayjs;
+  todayDate?: Dayjs;
 }
 
 interface DailyTooltipData {
-  date: dayjs.Dayjs;
+  date: Dayjs;
   totalVolume: number;
   entryCount: number;
 }
@@ -32,6 +33,7 @@ export function EatOverviewChart({ dailyStats, todayDate }: EatOverviewChartProp
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const hasAutoScrolled = useRef(false);
   const barTooltipTimeout = useRef<number | undefined>(undefined);
+  const now = useMinuteTick();
 
   const {
     tooltipData,
@@ -63,7 +65,7 @@ export function EatOverviewChart({ dailyStats, todayDate }: EatOverviewChartProp
     );
   }
 
-  const today = (todayDate ?? dayjs()).startOf("day");
+  const today = (todayDate ?? now).startOf("day");
   const todayIndex = sortedDailyStats.findIndex((stat) => stat.date.isSame(today, "day"));
 
   const totalDays = sortedDailyStats.length;

@@ -3,7 +3,7 @@
  * Handles sleep/wake toggling functionality
  */
 
-import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { getTimestamp, calculateDateForCycle } from "~/lib/date-utils";
 import { getSheetValues, appendSheetValues, updateSheetValues, deleteSheetRow } from "~/server/proxy";
 import { DailyStat } from "~/types/sleep";
@@ -42,8 +42,8 @@ export async function toggleSleep(params: {
   cycle: "Day" | "Night";
   what: "Sleep" | "Awake";
   todayStat: DailyStat | null;
-  now: dayjs.Dayjs;
-  lastEntryDate?: dayjs.Dayjs | null;
+  now: Dayjs;
+  lastEntryDate?: Dayjs | null;
 }): Promise<{ success: boolean; action: "started" | "ended"; }> {
   const { sheetUrl, time, cycle, what, todayStat, now, lastEntryDate } = params;
 
@@ -97,7 +97,7 @@ export async function toggleSleep(params: {
       // Use the last entry date from history if available, otherwise fall back to now.
       const lastDate = lastEntryDate ?? todayStat?.entries.at(-1)?.date ?? now;
       const newDate = calculateDateForCycle(cycle, lastDate, now);
-      const addedDate = getTimestamp();
+      const addedDate = getTimestamp(now);
 
       const newEntry = [
         addedDate, // Added Date
@@ -127,7 +127,7 @@ export async function toggleSleep(params: {
 
 export async function addSleepEntryManual(params: {
   sheetUrl: string;
-  date: dayjs.Dayjs;
+  date: Dayjs;
   startTime: string;
   endTime?: string;
   cycle: "Day" | "Night";
@@ -158,7 +158,7 @@ export async function addSleepEntryManual(params: {
 export async function updateSleepEntry(params: {
   sheetUrl: string;
   rowIndex: number;
-  date: dayjs.Dayjs;
+  date: Dayjs;
   startTime: string;
   endTime?: string;
   cycle: "Day" | "Night";

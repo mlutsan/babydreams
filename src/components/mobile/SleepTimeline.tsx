@@ -21,6 +21,7 @@ import type { DailyStat, SleepEntry } from "~/types/sleep";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
 import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
 import { useCurrentTimeMinutes } from "~/hooks/useCurrentTimeMinutes";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { deleteSleepEntry } from "~/lib/sleep-service";
 import { useToast } from "~/hooks/useToast";
@@ -79,6 +80,7 @@ export function ResponsiveSleepTimeline({
   const queryClient = useQueryClient();
   const { error } = useToast();
   const { openEdit } = useSleepModal();
+  const now = useMinuteTick();
 
   // Track which bar is currently highlighted
   const [highlightedBarId, setHighlightedBarId] = useState<string | null>(null);
@@ -101,11 +103,10 @@ export function ResponsiveSleepTimeline({
 
   // Transform day stats into sleep bars with time-of-day positioning
   const { sleepBars, minTimeOfDay, maxTimeOfDay, referenceDate } = useMemo(() => {
-    const now = dayjs();
     const bars: SleepBar[] = [];
     let minTimeMinutes = Infinity;
     let maxTimeMinutes = -Infinity;
-    const todayLogicalDate = dayjs().format("YYYY-MM-DD");
+    const todayLogicalDate = now.format("YYYY-MM-DD");
     const mostRecentStatIndex = allDayStats.length - 1;
 
 
@@ -172,7 +173,7 @@ export function ResponsiveSleepTimeline({
     });
 
     // Use a reference date (any date) to format time labels
-    const refDate = dayjs().startOf("day");
+    const refDate = now.startOf("day");
 
     return {
       sleepBars: bars,
@@ -180,7 +181,7 @@ export function ResponsiveSleepTimeline({
       maxTimeOfDay: maxTimeMinutes !== -Infinity ? maxTimeMinutes : 1440,
       referenceDate: refDate,
     };
-  }, [allDayStats]);
+  }, [allDayStats, now]);
 
   // Calculate SVG dimensions
   const totalDays = allDayStats.length;
@@ -228,7 +229,7 @@ export function ResponsiveSleepTimeline({
 
   // Today index for highlighting
   const todayIndex = allDayStats.findIndex((stat) => {
-    return dayjs(stat.logicalDate).isSame(dayjs(), "day");
+    return dayjs(stat.logicalDate).isSame(now, "day");
   });
 
   // Current time indicator - always show

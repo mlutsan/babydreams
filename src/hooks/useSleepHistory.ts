@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useAtomValue } from "jotai";
 import { useState, useEffect, useMemo } from "react";
+import { useAtomValue } from "jotai";
 import { sheetUrlAtom } from "~/lib/atoms";
 import { getHistory } from "~/lib/history-service";
-import dayjs from "dayjs";
 import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 
 /**
  * Hook for fetching sleep history data
@@ -35,6 +35,7 @@ export function useSleepHistory() {
  */
 export function useTodaySleepStat() {
   const { data: allStats, ...queryResult } = useSleepHistory();
+  const now = useMinuteTick();
 
   // Find today's stat from the history
   const todayStat = useMemo(() => {
@@ -42,7 +43,6 @@ export function useTodaySleepStat() {
       return null;
     }
 
-    const now = dayjs();
     // Find the stat where endDatetime is today
     const today = allStats.at(-1) || null;
     if (now.isSame(today?.startDatetime, "date")) {
@@ -63,7 +63,7 @@ export function useTodaySleepStat() {
       }
     }
     return null;
-  }, [allStats]);
+  }, [allStats, now]);
 
   // Extract sleep state from today's data using the last entry
   const sleepState = useMemo(() => {
@@ -71,7 +71,6 @@ export function useTodaySleepStat() {
       return null;
     }
 
-    const now = dayjs();
     const lastEntry = todayStat.entries[todayStat.entries.length - 1];
 
     if (lastEntry.endTime === null) {
@@ -119,7 +118,7 @@ export function useTodaySleepStat() {
         awakeDuration,
       };
     }
-  }, [todayStat]);
+  }, [todayStat, now]);
 
   return {
     todayStat,

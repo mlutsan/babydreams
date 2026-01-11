@@ -4,16 +4,17 @@
  */
 
 import { useMemo } from "react";
-import dayjs from "dayjs";
+import type { Dayjs } from "dayjs";
 import { Block, BlockTitle } from "konsta/react";
 import type { DailyEatStat } from "~/lib/eat-service";
 import type { DailyStat } from "~/types/sleep";
 import { EatStepChart } from "~/components/mobile/EatStepChart";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 
 interface EatStatsProps {
   dailyStats: DailyEatStat[];
   sleepStats?: DailyStat[];
-  todayDate?: dayjs.Dayjs;
+  todayDate?: Dayjs;
 }
 
 interface WindowStats {
@@ -27,8 +28,8 @@ interface WindowStats {
 
 function calculateRangeStats(
   stats: DailyEatStat[],
-  rangeStart: dayjs.Dayjs,
-  rangeEnd: dayjs.Dayjs
+  rangeStart: Dayjs,
+  rangeEnd: Dayjs
 ): WindowStats {
   const windowStats = stats.filter((s) => {
     const date = s.date;
@@ -110,8 +111,8 @@ function describeConsistency(volumes: number[]): string {
 }
 
 export function EatStats({ dailyStats, sleepStats, todayDate }: EatStatsProps) {
+  const now = useMinuteTick();
   const stats = useMemo(() => {
-    const now = dayjs();
     const logicalToday = todayDate ?? dailyStats[0]?.date ?? now.startOf("day");
     const todayStart = logicalToday.startOf("day");
     const nowEnd = now.endOf("day");
@@ -213,7 +214,7 @@ export function EatStats({ dailyStats, sleepStats, todayDate }: EatStatsProps) {
       consistencyLabel,
       avgMealsPerDayLast7,
     };
-  }, [dailyStats, todayDate]);
+  }, [dailyStats, todayDate, now]);
 
   const {
     currentWindow,
@@ -236,8 +237,6 @@ export function EatStats({ dailyStats, sleepStats, todayDate }: EatStatsProps) {
   if (currentWindow.daysWithData === 0 && previousWindow.daysWithData === 0) {
     return null;
   }
-
-  const now = dayjs();
 
   // Flatten entries for today's and rolling calculations
   const allEntries = dailyStats.flatMap((d) => d.entries);

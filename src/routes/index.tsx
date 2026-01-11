@@ -2,7 +2,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState, useMemo, useEffect, useRef } from "react";
-import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
+import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { History as HistoryIcon } from "lucide-react";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
@@ -10,7 +11,6 @@ import { ResponsiveSleepTimeline } from "~/components/mobile/SleepTimeline";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useSleepModal } from "~/hooks/useSleepModal";
 import { useSleepForecast } from "~/hooks/useSleepForecast";
-import dayjs from "dayjs";
 import { SleepForecastCard, type ExpectedSleep, type Mood, type SleepState } from "~/components/mobile/SleepForecast";
 
 export const Route = createFileRoute("/")({
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/")({
 function Home() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const babyName = useAtomValue(babyNameAtom);
-  const [now, setNow] = useState(dayjs());
+  const now = useMinuteTick();
   const { openTrack } = useSleepModal();
   const { forecast } = useSleepForecast();
 
@@ -33,15 +33,6 @@ function Home() {
     return sleepState?.isActive ? 180 : 0;
   });
   const previousSleepingRef = useRef<boolean | null>(null);
-
-  // Update 'now' every minute to refresh awake time display
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(dayjs());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(interval);
-  }, []);
 
   // Increment rotation by 180deg on each state change
   useEffect(() => {

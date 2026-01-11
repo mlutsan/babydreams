@@ -16,6 +16,7 @@ import type { Bounds, BrushHandleRenderProps } from "@visx/brush";
 import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { curveMonotoneX, curveStepAfter } from "@visx/curve";
 import { Info } from "lucide-react";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import type { DailyEatStat } from "~/lib/eat-service";
 import type { DailyStat } from "~/types/sleep";
 import { cycleSettingsAtom } from "~/lib/atoms";
@@ -179,6 +180,7 @@ export function EatStepChart({
   height = STEP_CHART_HEIGHT,
 }: EatStepChartProps) {
   const cycleSettings = useAtomValue(cycleSettingsAtom);
+  const now = useMinuteTick();
   const tooltipTimeout = useRef<number | undefined>(undefined);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const hintRef = useRef<HTMLDivElement>(null);
@@ -206,7 +208,7 @@ export function EatStepChart({
     return null;
   }
 
-  const today = (todayDate ?? dayjs()).startOf("day");
+  const today = (todayDate ?? now).startOf("day");
   const todayStat = sortedDailyStats.find((stat) => stat.date.isSame(today, "day")) ?? null;
   const yesterday = today.subtract(1, "day");
   const yesterdayStat =
@@ -249,7 +251,7 @@ export function EatStepChart({
   const todayMealMinutes = todayMealMinutesRaw.map(normalizeMinutes);
   const lastMealMinute = todayMealMinutes.length > 0 ? Math.max(...todayMealMinutes) : null;
 
-  const nowMinutes = normalizeMinutes(getTimeOfDayMinutes(dayjs()));
+  const nowMinutes = normalizeMinutes(getTimeOfDayMinutes(now));
 
   const startMinutes = referenceStartMinutes;
 
@@ -861,7 +863,7 @@ export function EatStepChart({
                     scale={xScale}
                     tickValues={xTickValues}
                     tickFormat={(d) =>
-                      dayjs().startOf("day").add(Number(d), "minute").format("HH:mm")
+                      now.startOf("day").add(Number(d), "minute").format("HH:mm")
                     }
                     stroke="#cbd5e1"
                     tickStroke="#cbd5e1"

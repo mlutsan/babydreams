@@ -19,6 +19,7 @@ import { useSleepMutation } from "~/hooks/useSleepMutation";
 import { addSleepEntryManual, updateSleepEntry, deleteSleepEntry } from "~/lib/sleep-service";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "~/hooks/useToast";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import dayjs from "dayjs";
 import type { SleepEntry } from "~/types/sleep";
 
@@ -268,6 +269,8 @@ export function SleepModal({
   const mutation = useSleepMutation();
   const queryClient = useQueryClient();
   const { error } = useToast();
+  const uiNow = useMinuteTick();
+  const uiNowRef = useRef(uiNow);
 
   const resolvedMode: SleepModalMode = mode ?? (entry ? "edit" : "track");
   const isTrackMode = resolvedMode === "track";
@@ -332,20 +335,24 @@ export function SleepModal({
   }, [opened]);
 
   useEffect(() => {
+    uiNowRef.current = uiNow;
+  }, [uiNow]);
+
+  useEffect(() => {
     if (!opened) {
       return;
     }
 
     if (isTrackMode) {
-      const now = dayjs().format("HH:mm");
-      setSelectedTime(now);
-      setTrackCycle(calculateCycleFromTime(now, cycleSettings));
+      const currentTime = uiNowRef.current.format("HH:mm");
+      setSelectedTime(currentTime);
+      setTrackCycle(calculateCycleFromTime(currentTime, cycleSettings));
       return;
     }
 
     const defaultStartTime = entry
       ? entry.startTime.format("HH:mm")
-      : dayjs().format("HH:mm");
+      : uiNowRef.current.format("HH:mm");
     const defaultEndTime = entry?.endTime ? entry.endTime.format("HH:mm") : "";
     const defaultCycle = entry
       ? entry.cycle

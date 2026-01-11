@@ -10,6 +10,7 @@ import { X } from "lucide-react";
 import { babyNameAtom, cycleSettingsAtom, sheetUrlAtom } from "~/lib/atoms";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useEatMutation } from "~/hooks/useEatMutation";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import dayjs from "dayjs";
 import {
   addMinutesToTime,
@@ -46,6 +47,7 @@ export function EatModal({ opened, onClose }: EatModalProps) {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const { allStats: allSleepStats } = useTodaySleepStat();
   const mutation = useEatMutation();
+  const uiNow = useMinuteTick();
 
   const [volume, setVolume] = useState(100); // Default 100ml
   const [selectedTime, setSelectedTime] = useState("");
@@ -55,25 +57,26 @@ export function EatModal({ opened, onClose }: EatModalProps) {
   const initializedRef = useRef(false);
   const daySelectionWindowMinutes = 120;
 
+  const today = uiNow.format("YYYY-MM-DD");
+
   const hasCalendarTodayStat = useMemo(() => {
     if (!allSleepStats || allSleepStats.length === 0) {
       return false;
     }
-    const today = dayjs().format("YYYY-MM-DD");
     return allSleepStats.some((stat) => stat.logicalDate === today);
-  }, [allSleepStats]);
+  }, [allSleepStats, today]);
 
   const displayName = babyName || "baby";
   const modalTitle = `How much did ${displayName} eat?`;
 
   const showDaySelection = useMemo(() => {
-    const timeValue = selectedTime || dayjs().format("HH:mm");
+    const timeValue = selectedTime || uiNow.format("HH:mm");
     const selectedMinutes = timeToMinutes(timeValue);
     const dayStartMinutes = timeToMinutes(cycleSettings.dayStart);
     const diff = Math.abs(selectedMinutes - dayStartMinutes);
     const distance = Math.min(diff, MINUTES_PER_DAY - diff);
     return distance <= daySelectionWindowMinutes && !hasCalendarTodayStat;
-  }, [selectedTime, cycleSettings.dayStart, hasCalendarTodayStat]);
+  }, [selectedTime, cycleSettings.dayStart, hasCalendarTodayStat, uiNow]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -98,14 +101,13 @@ export function EatModal({ opened, onClose }: EatModalProps) {
       return;
     }
 
-    const now = dayjs();
-    setSelectedTime(now.format("HH:mm"));
+    setSelectedTime(uiNow.format("HH:mm"));
     setCycleDayManual(false);
 
-    const defaultCycleDate = getCycleDateForDatetime(now, allSleepStats, now);
-    setCycleDay(defaultCycleDate.isSame(now, "day") ? "today" : "yesterday");
+    const defaultCycleDate = getCycleDateForDatetime(uiNow, allSleepStats, uiNow);
+    setCycleDay(defaultCycleDate.isSame(uiNow, "day") ? "today" : "yesterday");
     initializedRef.current = true;
-  }, [opened, allSleepStats]);
+  }, [opened, allSleepStats, uiNow]);
 
   useEffect(() => {
     if (!opened || showDaySelection || !cycleDayManual) {
@@ -119,11 +121,10 @@ export function EatModal({ opened, onClose }: EatModalProps) {
       return;
     }
 
-    const now = dayjs();
     const datetime = resolveSelectedDatetime(selectedTime);
-    const defaultCycleDate = getCycleDateForDatetime(datetime, allSleepStats, now);
-    setCycleDay(defaultCycleDate.isSame(now, "day") ? "today" : "yesterday");
-  }, [opened, cycleDayManual, selectedTime, allSleepStats]);
+    const defaultCycleDate = getCycleDateForDatetime(datetime, allSleepStats, uiNow);
+    setCycleDay(defaultCycleDate.isSame(uiNow, "day") ? "today" : "yesterday");
+  }, [opened, cycleDayManual, selectedTime, allSleepStats, uiNow]);
 
   const handleConfirm = () => {
     if (!selectedTime || !sheetUrl) {

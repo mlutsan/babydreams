@@ -6,6 +6,7 @@
 import dayjs, { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
 import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { systemClock } from "~/lib/clock";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
 
 dayjs.extend(duration);
@@ -60,7 +61,7 @@ export function computeDailyStats(
     return [];
   }
 
-  const now = options.now ?? dayjs();
+  const now = options.now ?? systemClock.now();
   const gapMinutes = (options.gapHours ?? 12) * 60;
 
   const sortedEntries = [...entries].sort(

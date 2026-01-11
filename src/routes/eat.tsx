@@ -2,15 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { sheetUrlAtom, babyNameAtom } from "~/lib/atoms";
+import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
 import { getEatHistory } from "~/lib/eat-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
 import { EatStats } from "~/components/mobile/EatStats";
 import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useMinuteTick } from "~/hooks/useMinuteTick";
 import { Milk } from "lucide-react";
-import dayjs from "dayjs";
 import { getCycleDateForDatetime } from "~/lib/date-utils";
 
 export const Route = createFileRoute("/eat")({
@@ -22,20 +22,11 @@ function Eat() {
   const babyName = useAtomValue(babyNameAtom);
   const [modalOpen, setModalOpen] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
-  const [now, setNow] = useState(dayjs());
+  const now = useMinuteTick();
 
   // Wait for atoms to hydrate from storage
   useEffect(() => {
     setIsHydrated(true);
-  }, []);
-
-  // Update 'now' every minute to refresh time since last meal
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNow(dayjs());
-    }, 60000); // Update every minute
-
-    return () => clearInterval(interval);
   }, []);
 
   // Get today's sleep stat for current cycle date
@@ -60,7 +51,6 @@ function Eat() {
       return null;
     }
 
-    const now = dayjs();
     const calendarToday = allStats.find((stat) => stat.date.isSame(now, "day"));
     if (calendarToday) {
       return calendarToday;
@@ -74,7 +64,7 @@ function Eat() {
     );
 
     return today || null;
-  }, [allStats, allSleepStats]);
+  }, [allStats, allSleepStats, now]);
 
   // Calculate time since last meal in HH:mm format (must be before any returns)
   const lastMeal = todayStat?.entries[todayStat.entries.length - 1];
