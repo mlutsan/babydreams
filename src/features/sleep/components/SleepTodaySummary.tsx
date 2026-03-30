@@ -19,7 +19,7 @@ export function SleepTodaySummary({ summary }: SleepTodaySummaryProps) {
             </div>
           </div>
           <div className="text-center py-4">
-            <div className="text-sm opacity-70 mb-1">Awake Time</div>
+            <div className="text-sm opacity-70 mb-1">Total Awake</div>
             <div className="text-2xl font-semibold">
               {formatDurationHHMM(summary.awakeMinutes)}
             </div>
