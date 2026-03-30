@@ -1,11 +1,11 @@
 import { useAtom } from "jotai";
 import { sleepModalAtom } from "~/lib/atoms";
 import { SleepModal } from "~/components/mobile/SleepModal";
-import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { useLogicalDays } from "~/hooks/useLogicalDays";
 
 export function SleepModalHost() {
   const [modalState, setModalState] = useAtom(sleepModalAtom);
-  const { sleepState } = useTodaySleepStat();
+  const { sleepState } = useLogicalDays();
 
   const handleClose = () => {
     setModalState({

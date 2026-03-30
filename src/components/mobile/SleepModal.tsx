@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useAtomValue } from "jotai";
 import {
   Sheet,
@@ -14,12 +14,13 @@ import {
 import { X, Edit2, Trash2 } from "lucide-react";
 import { addMinutesToTime, getTimeAgoFromManualInput } from "~/lib/date-utils";
 import { babyNameAtom, sheetUrlAtom, cycleSettingsAtom, calculateCycleFromTime } from "~/lib/atoms";
-import { useTodaySleepStat } from "~/hooks/useSleepHistory";
 import { useSleepMutation } from "~/hooks/useSleepMutation";
 import { addSleepEntryManual, updateSleepEntry, deleteSleepEntry } from "~/lib/sleep-service";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "~/hooks/useToast";
 import { useMinuteTick } from "~/hooks/useMinuteTick";
+import { useLogicalDays } from "~/hooks/useLogicalDays";
+import { resolvePlacement } from "~/lib/entry-placement";
 import dayjs from "dayjs";
 import type { SleepEntry } from "~/types/sleep";
 
@@ -40,6 +41,8 @@ interface SleepTrackFormProps {
   cycle: "Day" | "Night";
   isSleeping: boolean;
   isSaving: boolean;
+  showCyclePicker: boolean;
+  cycleOptions: Array<"Day" | "Night">;
   onTimeChange: (value: string) => void;
   onCycleChange: (value: "Day" | "Night") => void;
   onAdjustTime: (minutes: number) => void;
@@ -51,6 +54,8 @@ function SleepTrackForm({
   cycle,
   isSleeping,
   isSaving,
+  showCyclePicker,
+  cycleOptions,
   onTimeChange,
   onCycleChange,
   onAdjustTime,
@@ -132,22 +137,19 @@ function SleepTrackForm({
         </Button>
       </div>
 
-      {!isSleeping && (
+      {!isSleeping && showCyclePicker && (
         <div className="space-y-2">
           <div className="text-sm opacity-70 text-center">Day or night cycle?</div>
           <Segmented rounded strong>
-            <SegmentedButton
-              active={cycle === "Day"}
-              onClick={() => onCycleChange("Day")}
-            >
-              Day
-            </SegmentedButton>
-            <SegmentedButton
-              active={cycle === "Night"}
-              onClick={() => onCycleChange("Night")}
-            >
-              Night
-            </SegmentedButton>
+            {cycleOptions.map((option) => (
+              <SegmentedButton
+                key={option}
+                active={cycle === option}
+                onClick={() => onCycleChange(option)}
+              >
+                {option}
+              </SegmentedButton>
+            ))}
           </Segmented>
         </div>
       )}
@@ -265,12 +267,17 @@ export function SleepModal({
   const babyName = useAtomValue(babyNameAtom);
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const cycleSettings = useAtomValue(cycleSettingsAtom);
-  const { todayStat, allStats } = useTodaySleepStat();
   const mutation = useSleepMutation();
   const queryClient = useQueryClient();
   const { error } = useToast();
   const uiNow = useMinuteTick();
   const uiNowRef = useRef(uiNow);
+  const {
+    logicalDays,
+    todaySleepStat,
+    sleepStats,
+    isLoading: isLogicalLoading,
+  } = useLogicalDays();
 
   const resolvedMode: SleepModalMode = mode ?? (entry ? "edit" : "track");
   const isTrackMode = resolvedMode === "track";
@@ -283,6 +290,16 @@ export function SleepModal({
   const [endTime, setEndTime] = useState("");
   const [editCycle, setEditCycle] = useState<"Day" | "Night">("Day");
   const [isActive, setIsActive] = useState(false);
+  const [cycleManual, setCycleManual] = useState(false);
+
+  const allSleepStats = sleepStats;
+
+  const todayStat = todaySleepStat ?? null;
+
+  const lastEntryDate = useMemo(() => {
+    const lastStat = allSleepStats.at(-1);
+    return lastStat?.entries.at(-1)?.date ?? null;
+  }, [allSleepStats]);
 
   const addMutation = useMutation({
     mutationFn: addSleepEntryManual,
@@ -347,6 +364,7 @@ export function SleepModal({
       const currentTime = uiNowRef.current.format("HH:mm");
       setSelectedTime(currentTime);
       setTrackCycle(calculateCycleFromTime(currentTime, cycleSettings));
+      setCycleManual(false);
       return;
     }
 
@@ -366,10 +384,13 @@ export function SleepModal({
 
   useEffect(() => {
     if (isTrackMode && selectedTime) {
+      if (cycleManual) {
+        return;
+      }
       const autoCycle = calculateCycleFromTime(selectedTime, cycleSettings);
       setTrackCycle(autoCycle);
     }
-  }, [selectedTime, cycleSettings, isTrackMode]);
+  }, [selectedTime, cycleSettings, isTrackMode, cycleManual]);
 
   useEffect(() => {
     if (!allowActiveToggle) {
@@ -383,12 +404,43 @@ export function SleepModal({
     }
   }, [isActive]);
 
+  const placementDecision = useMemo(() => {
+    if (!isTrackMode || !selectedTime) {
+      return null;
+    }
+    const [hours, minutes] = selectedTime.split(":").map(Number);
+    const selectedDatetime = uiNow.hour(hours).minute(minutes).second(0);
+    const t = resolvePlacement({
+      datetime: selectedDatetime,
+      logicalDays,
+      dayStart: cycleSettings.dayStart,
+      now: uiNow,
+    });
+
+    return t;
+  }, [isTrackMode, selectedTime, logicalDays, cycleSettings.dayStart, uiNow]);
+
+  const showCyclePicker =
+    isTrackMode && !isSleeping && (placementDecision?.isAmbiguous ?? false);
+  const cycleOptions = useMemo<Array<"Day" | "Night">>(() => {
+    if (!placementDecision?.options) {
+      return ["Day", "Night"];
+    }
+    return placementDecision.options.map((option) =>
+      option.label === "Start new day" ? "Day" : "Night"
+    );
+  }, [placementDecision]);
+
+  useEffect(() => {
+    if (!showCyclePicker && cycleManual) {
+      setCycleManual(false);
+    }
+  }, [showCyclePicker, cycleManual]);
+
   const handleConfirm = () => {
     if (!selectedTime || !sheetUrl) {
       return;
     }
-
-    const lastEntryDate = allStats?.at(-1)?.entries.at(-1)?.date ?? null;
 
     mutation.mutate(
       {
@@ -399,6 +451,7 @@ export function SleepModal({
         todayStat: todayStat || null,
         now: dayjs(),
         lastEntryDate,
+        dayStart: cycleSettings.dayStart,
       },
       {
         onSuccess: onClose,
@@ -428,6 +481,7 @@ export function SleepModal({
         startTime,
         endTime: isActive ? "" : endTime,
         cycle: editCycle,
+        dayStart: cycleSettings.dayStart,
       });
       return;
     }
@@ -443,6 +497,7 @@ export function SleepModal({
         startTime,
         endTime: isActive ? "" : endTime,
         cycle: editCycle,
+        dayStart: cycleSettings.dayStart,
       });
     }
   };
@@ -482,6 +537,7 @@ export function SleepModal({
     ?? null;
 
   const isSaving = mutation.isPending || addMutation.isPending || updateMutation.isPending;
+  const isTrackSaving = isSaving || isLogicalLoading;
 
   return (
     <Sheet
@@ -521,9 +577,14 @@ export function SleepModal({
               selectedTime={selectedTime}
               cycle={trackCycle}
               isSleeping={!!isSleeping}
-              isSaving={mutation.isPending}
+              isSaving={isTrackSaving}
+              showCyclePicker={showCyclePicker}
+              cycleOptions={cycleOptions}
               onTimeChange={setSelectedTime}
-              onCycleChange={setTrackCycle}
+              onCycleChange={(value) => {
+                setTrackCycle(value);
+                setCycleManual(true);
+              }}
               onAdjustTime={handleTimeAdjustment}
               onConfirm={handleConfirm}
             />

@@ -13,9 +13,10 @@ export type SleepEntry = {
   date: dayjs.Dayjs;
   startTime: Duration;
   endTime: Duration | null; // null means actively sleeping
+  endDatetime?: dayjs.Dayjs | null; // Actual end datetime when available
   cycle: "Day" | "Night";
   length: string | number; // Computed column for reference
-  realDatetime: dayjs.Dayjs; // Computed: actual datetime of sleep (date + startTime, adjusted for night after midnight)
+  realDatetime: dayjs.Dayjs; // Actual start datetime from sheet
   sheetRowIndex?: number; // 1-based row index in Google Sheet (includes header row)
 };
 

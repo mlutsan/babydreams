@@ -19,7 +19,7 @@ import { defaultStyles, useTooltip, useTooltipInPortal } from "@visx/tooltip";
 import { Button } from "konsta/react";
 import type { DailyStat, SleepEntry } from "~/types/sleep";
 import { formatDuration, formatDurationHHMM } from "~/lib/date-utils";
-import { resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { getSleepEntryEndInfo } from "~/lib/sleep-utils";
 import { useCurrentTimeMinutes } from "~/hooks/useCurrentTimeMinutes";
 import { useMinuteTick } from "~/hooks/useMinuteTick";
 import { sheetUrlAtom } from "~/lib/atoms";
@@ -125,27 +125,10 @@ export function ResponsiveSleepTimeline({
       dayStat.entries.forEach((entry, entryIndex) => {
         const sleepStart = entry.realDatetime;
 
-        let sleepEnd: dayjs.Dayjs;
-        let durationMinutes = 0;
-        let isActive = false;
-
-        if (entry.endTime === null) {
-          const resolved = resolveActiveSleepEnd({
-            startDatetime: sleepStart,
-            now,
-          });
-          sleepEnd = resolved.endDatetime;
-          durationMinutes = resolved.durationMinutes;
-          isActive = resolved.isActive;
-        } else {
-          sleepEnd = entry.realDatetime.startOf("day").add(entry.endTime);
-          const startMinutes = Math.floor(entry.startTime.asMinutes());
-          const endMinutes = Math.floor(entry.endTime.asMinutes());
-          if (endMinutes < startMinutes) {
-            sleepEnd = sleepEnd.add(1, "day");
-          }
-          durationMinutes = sleepEnd.diff(sleepStart, "minutes");
-        }
+        const endInfo = getSleepEntryEndInfo(entry, now);
+        const sleepEnd = endInfo.endDatetime;
+        const durationMinutes = endInfo.durationMinutes;
+        const isActive = endInfo.isActive;
 
         const hoursStart = sleepStart.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;
         const hoursEnd = sleepEnd.startOf("day").diff(dayStat.startDatetime.startOf("day"), "days") * 24 * 60;

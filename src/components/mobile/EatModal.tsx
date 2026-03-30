@@ -7,34 +7,29 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { useAtomValue } from "jotai";
 import { Sheet, Button, Range, Block, Toolbar, ToolbarPane, Link, Segmented, SegmentedButton } from "konsta/react";
 import { X } from "lucide-react";
-import { babyNameAtom, cycleSettingsAtom, sheetUrlAtom } from "~/lib/atoms";
-import { useTodaySleepStat } from "~/hooks/useSleepHistory";
+import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
 import { useEatMutation } from "~/hooks/useEatMutation";
 import { useMinuteTick } from "~/hooks/useMinuteTick";
 import dayjs from "dayjs";
 import {
   addMinutesToTime,
   getTimeAgoFromManualInput,
-  getCycleDateForDatetime,
-  MINUTES_PER_DAY,
-  timeToMinutes,
 } from "~/lib/date-utils";
+import { useEntryPlacement } from "~/hooks/useEntryPlacement";
 
 interface EatModalProps {
   opened: boolean;
   onClose: () => void;
 }
 
-type MealDayOption = "today" | "yesterday";
-
-function resolveSelectedDatetime(time: string): dayjs.Dayjs {
+function resolveSelectedDatetime(time: string, now: dayjs.Dayjs = dayjs()): dayjs.Dayjs {
   const [hours, minutes] = time.split(":").map(Number);
-  let datetime = dayjs().hour(hours).minute(minutes).second(0);
+  let datetime = now.hour(hours).minute(minutes).second(0);
 
   // Tracking is always about the past.
   // If computed datetime is significantly in the future (>60 min grace), it must be yesterday.
   // Example: now is 00:05, user enters 23:55 → should be yesterday at 23:55
-  if (datetime.isAfter(dayjs().add(60, "minute"))) {
+  if (datetime.isAfter(now.add(60, "minute"))) {
     datetime = datetime.subtract(1, "day");
   }
 
@@ -43,40 +38,41 @@ function resolveSelectedDatetime(time: string): dayjs.Dayjs {
 
 export function EatModal({ opened, onClose }: EatModalProps) {
   const babyName = useAtomValue(babyNameAtom);
-  const cycleSettings = useAtomValue(cycleSettingsAtom);
   const sheetUrl = useAtomValue(sheetUrlAtom);
-  const { allStats: allSleepStats } = useTodaySleepStat();
   const mutation = useEatMutation();
   const uiNow = useMinuteTick();
+  const {
+    resolvePlacement,
+    commitPlacement,
+    isLoading: isPlacementLoading,
+  } = useEntryPlacement();
 
   const [volume, setVolume] = useState(100); // Default 100ml
   const [selectedTime, setSelectedTime] = useState("");
-  const [cycleDay, setCycleDay] = useState<MealDayOption>("today");
+  const [selectedLogicalDate, setSelectedLogicalDate] = useState<string | null>(null);
   const [cycleDayManual, setCycleDayManual] = useState(false);
   const timeInputRef = useRef<HTMLInputElement>(null);
   const initializedRef = useRef(false);
   const daySelectionWindowMinutes = 120;
 
-  const today = uiNow.format("YYYY-MM-DD");
-
-  const hasCalendarTodayStat = useMemo(() => {
-    if (!allSleepStats || allSleepStats.length === 0) {
-      return false;
-    }
-    return allSleepStats.some((stat) => stat.logicalDate === today);
-  }, [allSleepStats, today]);
-
   const displayName = babyName || "baby";
   const modalTitle = `How much did ${displayName} eat?`;
 
-  const showDaySelection = useMemo(() => {
-    const timeValue = selectedTime || uiNow.format("HH:mm");
-    const selectedMinutes = timeToMinutes(timeValue);
-    const dayStartMinutes = timeToMinutes(cycleSettings.dayStart);
-    const diff = Math.abs(selectedMinutes - dayStartMinutes);
-    const distance = Math.min(diff, MINUTES_PER_DAY - diff);
-    return distance <= daySelectionWindowMinutes && !hasCalendarTodayStat;
-  }, [selectedTime, cycleSettings.dayStart, hasCalendarTodayStat, uiNow]);
+  const placementDecision = useMemo(() => {
+    if (!selectedTime) {
+      return null;
+    }
+    const selectedDatetime = resolveSelectedDatetime(selectedTime, uiNow);
+    return resolvePlacement({
+      datetime: selectedDatetime,
+      boundaryMinutes: daySelectionWindowMinutes,
+    });
+  }, [selectedTime, uiNow, resolvePlacement]);
+
+  const showDaySelection = placementDecision?.isAmbiguous ?? false;
+
+  const resolvedSelectedLogicalDate =
+    selectedLogicalDate ?? placementDecision?.logicalDate ?? null;
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -102,12 +98,10 @@ export function EatModal({ opened, onClose }: EatModalProps) {
     }
 
     setSelectedTime(uiNow.format("HH:mm"));
+    setSelectedLogicalDate(null);
     setCycleDayManual(false);
-
-    const defaultCycleDate = getCycleDateForDatetime(uiNow, allSleepStats, uiNow);
-    setCycleDay(defaultCycleDate.isSame(uiNow, "day") ? "today" : "yesterday");
     initializedRef.current = true;
-  }, [opened, allSleepStats, uiNow]);
+  }, [opened, uiNow]);
 
   useEffect(() => {
     if (!opened || showDaySelection || !cycleDayManual) {
@@ -121,21 +115,28 @@ export function EatModal({ opened, onClose }: EatModalProps) {
       return;
     }
 
-    const datetime = resolveSelectedDatetime(selectedTime);
-    const defaultCycleDate = getCycleDateForDatetime(datetime, allSleepStats, uiNow);
-    setCycleDay(defaultCycleDate.isSame(uiNow, "day") ? "today" : "yesterday");
-  }, [opened, cycleDayManual, selectedTime, allSleepStats, uiNow]);
+    if (placementDecision?.logicalDate) {
+      setSelectedLogicalDate(placementDecision.logicalDate);
+    }
+  }, [opened, cycleDayManual, selectedTime, placementDecision]);
 
   const handleConfirm = () => {
     if (!selectedTime || !sheetUrl) {
       return;
     }
 
-    const datetime = resolveSelectedDatetime(selectedTime);
-
+    const datetime = resolveSelectedDatetime(selectedTime, dayjs());
     const now = dayjs();
-    const cycleDate =
-      cycleDay === "today" ? now.startOf("day") : now.subtract(1, "day").startOf("day");
+    const overrideLogicalDate =
+      cycleDayManual && showDaySelection
+        ? (selectedLogicalDate ?? placementDecision?.logicalDate ?? null)
+        : null;
+    const cycleDate = commitPlacement({
+      datetime,
+      overrideLogicalDate,
+      boundaryMinutes: daySelectionWindowMinutes,
+      now,
+    });
 
     mutation.mutate(
       {
@@ -249,27 +250,20 @@ export function EatModal({ opened, onClose }: EatModalProps) {
 
           {/* Day Selection */}
           {showDaySelection && (
-            <div className="space-y-2">
-              <div className="text-sm opacity-70 text-center">Log this meal for</div>
-              <Segmented rounded strong>
-                <SegmentedButton
-                  active={cycleDay === "today"}
-                  onClick={() => {
-                    setCycleDay("today");
-                    setCycleDayManual(true);
-                  }}
-                >
-                  Today
-                </SegmentedButton>
-                <SegmentedButton
-                  active={cycleDay === "yesterday"}
-                  onClick={() => {
-                    setCycleDay("yesterday");
-                    setCycleDayManual(true);
-                  }}
-                >
-                  Yesterday
-                </SegmentedButton>
+            <div className="space-y-2 mt-8">
+              <Segmented rounded strong className="">
+                {placementDecision?.options?.map((option) => (
+                  <SegmentedButton
+                    key={option.logicalDate}
+                    active={resolvedSelectedLogicalDate === option.logicalDate}
+                    onClick={() => {
+                      setSelectedLogicalDate(option.logicalDate);
+                      setCycleDayManual(true);
+                    }}
+                  >
+                    {option.label}
+                  </SegmentedButton>
+                ))}
               </Segmented>
             </div>
           )}
@@ -280,7 +274,7 @@ export function EatModal({ opened, onClose }: EatModalProps) {
               large
               rounded
               onClick={handleConfirm}
-              disabled={mutation.isPending}
+              disabled={mutation.isPending || isPlacementLoading}
               className="bg-amber-500 active:bg-amber-600"
             >
               {mutation.isPending ? "Om-nom-noming..." : "Confirm"}

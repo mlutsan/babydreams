@@ -16,7 +16,7 @@ import { formatDuration } from "~/lib/date-utils";
 import dayjs from "dayjs";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
 import { HistoryDayCard } from "~/components/history/HistoryDayCard";
-import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { getSleepEntryEndInfo } from "~/lib/sleep-utils";
 import { useSleepModal } from "~/hooks/useSleepModal";
 import { useMinuteTick } from "~/hooks/useMinuteTick";
 
@@ -187,20 +187,19 @@ function History() {
                     {entriesSorted.map((entry, entryIndex) => {
                       const key = entryKey(entry, entryIndex);
                       const startLabel = entry.startTime.format("HH:mm");
-                      let endLabel = entry.endTime ? entry.endTime.format("HH:mm") : "Now";
+                      let endLabel = "Now";
                       let durationMinutes = 0;
                       let statusLabel = "";
 
                       if (entry.endTime) {
-                        durationMinutes = calculateSleepDuration(entry.startTime, entry.endTime);
+                        const endInfo = getSleepEntryEndInfo(entry, now);
+                        durationMinutes = endInfo.durationMinutes;
+                        endLabel = endInfo.endDatetime.format("HH:mm");
                       } else {
-                        const resolved = resolveActiveSleepEnd({
-                          startDatetime: entry.realDatetime,
-                          now,
-                        });
-                        durationMinutes = resolved.durationMinutes;
-                        if (resolved.wasCapped) {
-                          endLabel = resolved.endDatetime.format("HH:mm");
+                        const endInfo = getSleepEntryEndInfo(entry, now);
+                        durationMinutes = endInfo.durationMinutes;
+                        if (endInfo.wasCapped) {
+                          endLabel = endInfo.endDatetime.format("HH:mm");
                           statusLabel = "Auto-ended";
                         } else {
                           statusLabel = "Active";

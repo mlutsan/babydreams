@@ -8,8 +8,8 @@ dayjs.extend(duration);
 
 type EntryInput = {
   date: string;
-  start: { hours: number; minutes: number };
-  end?: { hours: number; minutes: number };
+  start: { hours: number; minutes: number; };
+  end?: { hours: number; minutes: number; };
   cycle: "Day" | "Night";
 };
 
@@ -88,5 +88,42 @@ describe("computeDailyStats", () => {
     expect(stats[0].logicalDate).toBe("2024-01-01");
     expect(stats[1].logicalDate).toBe("2024-01-02");
     expect(stats[1].startDatetime.format("HH:mm")).toBe("05:30");
+  });
+
+  it("keeps hasActiveSleep true when a night session is still active", () => {
+    const entries: SleepEntry[] = [
+      makeEntry({
+        date: "2026-01-13",
+        start: { hours: 19, minutes: 3 },
+        end: { hours: 19, minutes: 42 },
+        cycle: "Day",
+      }),
+      makeEntry({
+        date: "2026-01-13",
+        start: { hours: 21, minutes: 23 },
+        end: { hours: 8, minutes: 23 },
+        cycle: "Night",
+      }),
+      makeEntry({
+        date: "2026-01-14",
+        start: { hours: 19, minutes: 3 },
+        end: { hours: 19, minutes: 42 },
+        cycle: "Day",
+      }),
+      makeEntry({
+        date: "2026-01-14",
+        start: { hours: 21, minutes: 23 },
+        cycle: "Night",
+      }),
+    ];
+
+    const now = dayjs("2026-01-15T08:00:00");
+    const stats = computeDailyStats(entries, { now });
+
+    expect(stats).toHaveLength(2);
+    expect(stats[1].hasActiveSleep).toBe(true);
+    expect(stats[1].endDatetime.format("YYYY-MM-DD HH:mm")).toBe(
+      now.format("YYYY-MM-DD HH:mm")
+    );
   });
 });

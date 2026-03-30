@@ -4,7 +4,7 @@
 
 import type { Dayjs } from "dayjs";
 import { computeDailyStats } from "~/lib/sleep-model";
-import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { getSleepEntryEndInfo } from "~/lib/sleep-utils";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
 import { systemClock } from "~/lib/clock";
 
@@ -44,43 +44,10 @@ export type SleepForecastOptions = {
 const NOISE_RATIO_THRESHOLD = 0.35;
 const MAX_AWAKE_MINUTES_CAP = 12 * 60;
 
-type EntryEndInfo = {
-  endDatetime: Dayjs;
-  durationMinutes: number;
-  isActive: boolean;
-};
-
 type AwakeSleepPair = {
   awakeMinutes: number;
   sleepMinutes: number;
 };
-
-function getEntryEndInfo(entry: SleepEntry, now: Dayjs): EntryEndInfo {
-  if (entry.endTime === null) {
-    const resolved = resolveActiveSleepEnd({
-      startDatetime: entry.realDatetime,
-      now,
-    });
-    return {
-      endDatetime: resolved.endDatetime,
-      durationMinutes: resolved.durationMinutes,
-      isActive: resolved.isActive,
-    };
-  }
-
-  let endDatetime = entry.realDatetime.startOf("day").add(entry.endTime);
-  const startMinutes = Math.floor(entry.startTime.asMinutes());
-  const endMinutes = Math.floor(entry.endTime.asMinutes());
-  if (endMinutes < startMinutes) {
-    endDatetime = endDatetime.add(1, "day");
-  }
-
-  return {
-    endDatetime,
-    durationMinutes: calculateSleepDuration(entry.startTime, entry.endTime),
-    isActive: false,
-  };
-}
 
 function quantile(values: number[], q: number): number | null {
   if (values.length === 0) {
@@ -143,7 +110,7 @@ function getIndexedSleepDurations(stats: DailyStat[], now: Dayjs): Map<number, n
   stats.forEach((stat) => {
     const dayEntries = getDayEntriesForStat(stat);
     dayEntries.forEach((entry, index) => {
-      const info = getEntryEndInfo(entry, now);
+      const info = getSleepEntryEndInfo(entry, now);
       const napIndex = index + 1;
       const values = map.get(napIndex) ?? [];
       values.push(info.durationMinutes);
@@ -170,7 +137,7 @@ function getIndexedWakeWindows(stats: DailyStat[], now: Dayjs): Map<number, numb
     for (let i = 1; i < dayEntries.length; i += 1) {
       const prev = dayEntries[i - 1];
       const next = dayEntries[i];
-      const prevEnd = getEntryEndInfo(prev, now);
+      const prevEnd = getSleepEntryEndInfo(prev, now);
       if (prevEnd.isActive) {
         continue;
       }
@@ -198,7 +165,7 @@ function getIndexedAwakeSleepPairs(stats: DailyStat[], now: Dayjs): Map<number, 
 
     for (let i = 0; i < dayEntries.length; i += 1) {
       const entry = dayEntries[i];
-      const entryEnd = getEntryEndInfo(entry, now);
+      const entryEnd = getSleepEntryEndInfo(entry, now);
       if (entryEnd.isActive) {
         continue;
       }
@@ -208,7 +175,7 @@ function getIndexedAwakeSleepPairs(stats: DailyStat[], now: Dayjs): Map<number, 
         awakeMinutes = entry.realDatetime.diff(stat.startDatetime, "minutes");
       } else {
         const prev = dayEntries[i - 1];
-        const prevEnd = getEntryEndInfo(prev, now);
+        const prevEnd = getSleepEntryEndInfo(prev, now);
         if (prevEnd.isActive) {
           continue;
         }
@@ -537,7 +504,7 @@ export function computeSleepForecast(
   let currentAwakeMinutes: number | null = null;
   let lastSleepEnd: Dayjs | null = null;
   if (lastEntry) {
-    const lastEndInfo = getEntryEndInfo(lastEntry, now);
+    const lastEndInfo = getSleepEntryEndInfo(lastEntry, now);
     if (!lastEndInfo.isActive) {
       lastSleepEnd = lastEndInfo.endDatetime;
       const rawAwakeMinutes = Math.max(0, Math.round(now.diff(lastEndInfo.endDatetime, "minutes")));

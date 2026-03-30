@@ -4,12 +4,47 @@
  */
 
 import type { Dayjs } from "dayjs";
-import { getTimestamp, calculateDateForCycle } from "~/lib/date-utils";
+import { getTimestamp, calculateDateForCycle, timeToMinutes } from "~/lib/date-utils";
 import { getSheetValues, appendSheetValues, updateSheetValues, deleteSheetRow } from "~/server/proxy";
 import { DailyStat } from "~/types/sleep";
+import {
+  buildWallClockDateTimeFromMinutes,
+  formatDateForSheet,
+  formatDateTimeForSheet,
+} from "~/lib/sheets-utils";
 
 const SLEEP_SHEET = "Sleep";
 const HEADERS = ["Added Date", "Date", "Start Time", "End Time", "Cycle"] as const;
+
+function resolveStartDatetime(params: {
+  logicalDate: Dayjs;
+  time: string;
+  cycle: "Day" | "Night";
+  dayStart: string;
+}): Dayjs {
+  const { logicalDate, time, cycle, dayStart } = params;
+  const startMinutes = timeToMinutes(time);
+  const dayStartMinutes = timeToMinutes(dayStart);
+  return buildWallClockDateTimeFromMinutes(
+    logicalDate,
+    startMinutes,
+    cycle === "Night" && startMinutes < dayStartMinutes ? 1 : 0
+  );
+}
+
+function resolveEndDatetime(params: {
+  startDatetime: Dayjs;
+  endTime: string;
+}): Dayjs {
+  const { startDatetime, endTime } = params;
+  const startMinutes = startDatetime.hour() * 60 + startDatetime.minute();
+  const endMinutes = timeToMinutes(endTime);
+  return buildWallClockDateTimeFromMinutes(
+    startDatetime,
+    endMinutes,
+    endMinutes < startMinutes ? 1 : 0
+  );
+}
 
 async function ensureSleepHeaders(sheetUrl: string) {
   const range = `${SLEEP_SHEET}!A:F`;
@@ -44,8 +79,9 @@ export async function toggleSleep(params: {
   todayStat: DailyStat | null;
   now: Dayjs;
   lastEntryDate?: Dayjs | null;
+  dayStart: string;
 }): Promise<{ success: boolean; action: "started" | "ended"; }> {
-  const { sheetUrl, time, cycle, what, todayStat, now, lastEntryDate } = params;
+  const { sheetUrl, time, cycle, what, todayStat, now, lastEntryDate, dayStart } = params;
 
   // Client-side validation
   if (!["Day", "Night"].includes(cycle)) {
@@ -75,11 +111,16 @@ export async function toggleSleep(params: {
         throw new Error("Active sleep entry is missing sheet row index");
       }
 
+      const endDatetime = resolveEndDatetime({
+        startDatetime: activeEntry.realDatetime,
+        endTime: time,
+      });
+
       await updateSheetValues({
         data: {
           sheetUrl,
           range: `${SLEEP_SHEET}!D${activeEntry.sheetRowIndex}`,
-          values: [[time]],
+          values: [[formatDateTimeForSheet(endDatetime)]],
         },
       });
 
@@ -97,12 +138,18 @@ export async function toggleSleep(params: {
       // Use the last entry date from history if available, otherwise fall back to now.
       const lastDate = lastEntryDate ?? todayStat?.entries.at(-1)?.date ?? now;
       const newDate = calculateDateForCycle(cycle, lastDate, now);
+      const startDatetime = resolveStartDatetime({
+        logicalDate: newDate,
+        time,
+        cycle,
+        dayStart,
+      });
       const addedDate = getTimestamp(now);
 
       const newEntry = [
         addedDate, // Added Date
-        newDate.format("YYYY-MM-DD"), // Date
-        time, // Start Time (HH:mm from user)
+        formatDateForSheet(newDate), // Date
+        formatDateTimeForSheet(startDatetime), // Start Time
         "", // End Time (empty = actively sleeping)
         cycle, // Cycle (Day/Night)
         "", // Length (empty)
@@ -131,17 +178,28 @@ export async function addSleepEntryManual(params: {
   startTime: string;
   endTime?: string;
   cycle: "Day" | "Night";
+  dayStart: string;
 }): Promise<void> {
-  const { sheetUrl, date, startTime, endTime, cycle } = params;
+  const { sheetUrl, date, startTime, endTime, cycle, dayStart } = params;
   const range = `${SLEEP_SHEET}!A:F`;
 
   await ensureSleepHeaders(sheetUrl);
 
+  const startDatetime = resolveStartDatetime({
+    logicalDate: date,
+    time: startTime,
+    cycle,
+    dayStart,
+  });
+  const endDatetime = endTime
+    ? resolveEndDatetime({ startDatetime, endTime })
+    : null;
+
   const newEntry = [
     getTimestamp(),
-    date.format("YYYY-MM-DD"),
-    startTime,
-    endTime || "",
+    formatDateForSheet(date),
+    formatDateTimeForSheet(startDatetime),
+    endDatetime ? formatDateTimeForSheet(endDatetime) : "",
     cycle,
     "",
   ];
@@ -162,18 +220,34 @@ export async function updateSleepEntry(params: {
   startTime: string;
   endTime?: string;
   cycle: "Day" | "Night";
+  dayStart: string;
 }): Promise<void> {
-  const { sheetUrl, rowIndex, date, startTime, endTime, cycle } = params;
+  const { sheetUrl, rowIndex, date, startTime, endTime, cycle, dayStart } = params;
   if (!Number.isInteger(rowIndex) || rowIndex < 2) {
     throw new Error("rowIndex must be a valid sheet row");
   }
+
+  const startDatetime = resolveStartDatetime({
+    logicalDate: date,
+    time: startTime,
+    cycle,
+    dayStart,
+  });
+  const endDatetime = endTime
+    ? resolveEndDatetime({ startDatetime, endTime })
+    : null;
 
   const range = `${SLEEP_SHEET}!B${rowIndex}:E${rowIndex}`;
   await updateSheetValues({
     data: {
       sheetUrl,
       range,
-      values: [[date.format("YYYY-MM-DD"), startTime, endTime || "", cycle]],
+      values: [[
+        formatDateForSheet(date),
+        formatDateTimeForSheet(startDatetime),
+        endDatetime ? formatDateTimeForSheet(endDatetime) : "",
+        cycle,
+      ]],
     },
   });
 }

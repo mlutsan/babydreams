@@ -6,6 +6,9 @@
 import dayjs from "dayjs";
 import {
   serialNumberToDate,
+  serialNumberToDateTime,
+  formatDateForSheet,
+  formatDateTimeForSheet,
 } from "~/lib/sheets-utils";
 import {
   getSheetValues,
@@ -37,7 +40,7 @@ export function parseRow(row: unknown[]): EatEntry | null {
 
   try {
     // Column A: Date and Time (Excel serial number)
-    const datetime = serialNumberToDate(row[0] as number);
+    const datetime = serialNumberToDateTime(row[0] as number);
 
     // Column B: Cycle Date (Excel serial number)
     const cycleDate = serialNumberToDate(row[1] as number);
@@ -137,9 +140,9 @@ export async function addEatEntry(params: {
     throw new Error("Volume must be between 0 and 200 ml");
   }
 
-  const cycleDateString = cycleDate.startOf("day").format("YYYY-MM-DD");
+  const cycleDateString = formatDateForSheet(cycleDate.startOf("day"));
   const range = `${EAT_SHEET}!A:C`;
-  const values = [[datetime.format("YYYY-MM-DD HH:mm"), cycleDateString, volume]];
+  const values = [[formatDateTimeForSheet(datetime), cycleDateString, volume]];
 
   await appendSheetValues({ data: { sheetUrl, range, values } });
 }

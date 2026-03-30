@@ -1,17 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useAtomValue } from "jotai";
-import { useState, useEffect, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { babyNameAtom, sheetUrlAtom } from "~/lib/atoms";
 import { Block, BlockTitle, Button, Preloader } from "konsta/react";
-import { getEatHistory } from "~/lib/eat-service";
 import { EatModal } from "~/components/mobile/EatModal";
 import { EatOverviewChart } from "~/components/mobile/EatOverviewChart";
-import { EatStats } from "~/components/mobile/EatStats";
-import { useTodaySleepStat } from "~/hooks/useSleepHistory";
-import { useMinuteTick } from "~/hooks/useMinuteTick";
+import { EatStepChart } from "~/components/mobile/EatStepChart";
 import { Milk } from "lucide-react";
-import { getCycleDateForDatetime } from "~/lib/date-utils";
+import { EatTodaySummary } from "~/features/eat/components/EatTodaySummary";
+import { useEatPageData } from "~/features/eat/hooks/useEatPageData";
 
 export const Route = createFileRoute("/eat")({
   component: Eat,
@@ -21,64 +18,21 @@ function Eat() {
   const sheetUrl = useAtomValue(sheetUrlAtom);
   const babyName = useAtomValue(babyNameAtom);
   const [modalOpen, setModalOpen] = useState(false);
-  const [isHydrated, setIsHydrated] = useState(false);
-  const now = useMinuteTick();
 
-  // Wait for atoms to hydrate from storage
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
-
-  // Get today's sleep stat for current cycle date
-  const sleepQuery = useTodaySleepStat();
   const {
-    isFetched: isSleepFetched,
-    allStats: allSleepStats,
-  } = sleepQuery;
+    sleepStats,
+    eatStats,
+    todayEatStat,
+    isLoading,
+    isError,
+    error,
+    isHydrated,
+    refetch,
+    statusCard,
+    todaySummary,
+  } = useEatPageData();
 
-  // Query for all eating history
-  const { data: allStats, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["eatHistory", sheetUrl],
-    queryFn: () => getEatHistory(sheetUrl),
-    enabled: isHydrated && !!sheetUrl,
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    refetchInterval: 60000, // Refresh every minute
-  });
-
-  // Find today's stat, preferring calendar-today when entries exist
-  const todayStat = useMemo(() => {
-    if (!allStats || allStats.length === 0) {
-      return null;
-    }
-
-    const calendarToday = allStats.find((stat) => stat.date.isSame(now, "day"));
-    if (calendarToday) {
-      return calendarToday;
-    }
-
-    const todayLogicalDate =
-      getCycleDateForDatetime(now, allSleepStats, now).format("YYYY-MM-DD");
-
-    const today = allStats.find((stat) =>
-      stat.date.format("YYYY-MM-DD") === todayLogicalDate
-    );
-
-    return today || null;
-  }, [allStats, allSleepStats, now]);
-
-  // Calculate time since last meal in HH:mm format (must be before any returns)
-  const lastMeal = todayStat?.entries[todayStat.entries.length - 1];
-  const timeSinceLastMeal = useMemo(() => {
-    if (!lastMeal) {
-      return null;
-    }
-
-    const diffMinutes = now.diff(lastMeal.datetime, "minutes");
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-  }, [lastMeal, now]);
+  const todayStat = todayEatStat;
 
   // Show loading while atoms hydrate from storage
   if (!isHydrated) {
@@ -131,21 +85,21 @@ function Eat() {
           <div className="text-5xl">
             <Milk className="w-12 h-12 text-amber-600" />
           </div>
-          {todayStat && todayStat.totalVolume > 0 ? (
+          {statusCard.mode === "with-meals" ? (
             <>
               <div className="text-2xl font-semibold">
-                {todayStat.totalVolume} ml
+                {statusCard.totalVolume} ml
               </div>
-              {lastMeal && (
+              {statusCard.lastMealTime && statusCard.lastMealVolume !== null && (
                 <div className="gap-0 flex flex-col items-center mt-2 text-base opacity-70">
                   <div className="">
                     <span className="font-medium">
-                      {lastMeal.datetime.format("HH:mm")}
+                      {statusCard.lastMealTime}
                       {" · "}
-                      {timeSinceLastMeal && `${timeSinceLastMeal}`} ago
+                      {statusCard.lastMealAgo}
                     </span>
                     {" · "}
-                    <span>{lastMeal.volume} ml</span>
+                    <span>{statusCard.lastMealVolume} ml</span>
                   </div>
                   <div className="text-xs">
                     last meal
@@ -153,7 +107,7 @@ function Eat() {
                 </div>
               )}
             </>
-          ) : allStats && allStats.length > 0 ? (
+          ) : statusCard.mode === "no-meals-today" ? (
             <>
               <div className="text-xl font-semibold">
                 Today no meals yet
@@ -171,29 +125,33 @@ function Eat() {
           large
           rounded
           onClick={() => setModalOpen(true)}
-          disabled={!isSleepFetched}
+          disabled={isLoading}
           className="w-full bg-amber-500 active:bg-amber-600 mt-4"
         >
-          {!isSleepFetched ? "Loading..." : "Add Meal"}
+          {isLoading ? "Loading..." : "Add Meal"}
         </Button>
       </Block>
 
-      {/* Weekly Trends & Insights */}
-      {allStats && allStats.length > 0 && (
-        <EatStats
-          dailyStats={allStats}
-          sleepStats={allSleepStats}
-          todayDate={todayStat?.date}
-        />
+      {eatStats.length > 0 && (
+        <>
+          <EatTodaySummary summary={todaySummary} />
+          <Block strong inset>
+            <EatStepChart
+              dailyStats={eatStats}
+              sleepStats={sleepStats}
+              todayDate={todayStat?.date}
+            />
+          </Block>
+        </>
       )}
 
       {/* Meal Overview Chart */}
-      {allStats && allStats.length > 0 && (
+      {eatStats.length > 0 && (
         <>
-          {/* <BlockTitle>Meal History</BlockTitle> */}
+          <BlockTitle>History</BlockTitle>
           <Block strong inset>
             <EatOverviewChart
-              dailyStats={allStats}
+              dailyStats={eatStats}
               todayDate={todayStat?.date}
             />
           </Block>

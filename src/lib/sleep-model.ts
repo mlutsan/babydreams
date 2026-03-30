@@ -5,7 +5,7 @@
 
 import dayjs, { Dayjs } from "dayjs";
 import duration from "dayjs/plugin/duration";
-import { calculateSleepDuration, resolveActiveSleepEnd } from "~/lib/sleep-utils";
+import { getSleepEntryEndInfo } from "~/lib/sleep-utils";
 import { systemClock } from "~/lib/clock";
 import type { SleepEntry, DailyStat } from "~/types/sleep";
 
@@ -15,26 +15,6 @@ export type SleepComputationOptions = {
   now?: Dayjs;
   gapHours?: number;
 };
-
-/**
- * Convert date + time duration to full datetime, adjusting for night cycle.
- * Same logic as realDatetime calculation in parseRow.
- */
-function dateTimeToDatetime(
-  date: Dayjs,
-  time: duration.Duration,
-  cycle: "Day" | "Night"
-): Dayjs {
-  let datetime = date.startOf("day").add(time);
-  const timeMinutes = Math.floor(time.asMinutes());
-
-  // If night cycle and time is before 6 AM (after midnight), it's the next day.
-  if (cycle === "Night" && timeMinutes < 6 * 60) {
-    datetime = datetime.add(1, "day");
-  }
-
-  return datetime;
-}
 
 /**
  * Calculate awake minutes for a stat entry.
@@ -71,30 +51,13 @@ export function computeDailyStats(
   const stats: DailyStat[] = [];
   let currentStat: DailyStat | null = null;
   let previousEntry: SleepEntry | null = null;
+  let previousEntryEndDatetime: Dayjs | null = null;
 
   for (const entry of sortedEntries) {
-    let durationMinutes = 0;
-    let isActive = false;
-    let entryEndDatetime: Dayjs;
-
-    if (entry.endTime === null) {
-      const resolved = resolveActiveSleepEnd({
-        startDatetime: entry.realDatetime,
-        now,
-      });
-      isActive = resolved.isActive;
-      durationMinutes = resolved.durationMinutes;
-      entryEndDatetime = resolved.endDatetime;
-    } else {
-      durationMinutes = calculateSleepDuration(entry.startTime, entry.endTime);
-
-      entryEndDatetime = entry.realDatetime.startOf("day").add(entry.endTime);
-      const startMinutes = Math.floor(entry.startTime.asMinutes());
-      const endMinutes = Math.floor(entry.endTime.asMinutes());
-      if (endMinutes < startMinutes) {
-        entryEndDatetime = entryEndDatetime.add(1, "day");
-      }
-    }
+    const endInfo = getSleepEntryEndInfo(entry, now);
+    const durationMinutes = endInfo.durationMinutes;
+    const isActive = endInfo.isActive;
+    const entryEndDatetime = endInfo.endDatetime;
 
     let shouldCreateNewStat = false;
 
@@ -125,13 +88,9 @@ export function computeDailyStats(
         previousEntry &&
         previousEntry.cycle === "Night" &&
         entry.cycle === "Day" &&
-        previousEntry.endTime
+        previousEntryEndDatetime
       ) {
-        newStartDatetime = dateTimeToDatetime(
-          entry.date,
-          previousEntry.endTime,
-          entry.cycle
-        );
+        newStartDatetime = previousEntryEndDatetime;
       }
 
       currentStat = {
@@ -161,6 +120,7 @@ export function computeDailyStats(
     }
 
     previousEntry = entry;
+    previousEntryEndDatetime = entryEndDatetime;
   }
 
   if (currentStat) {

@@ -9,7 +9,6 @@ export function getOverrideNow(): Dayjs | null {
   if (cachedOverride !== undefined) {
     return cachedOverride;
   }
-
   if (!overrideValue) {
     cachedOverride = null;
     return cachedOverride;

@@ -8,6 +8,7 @@ import { getAccessToken } from "~/server/sa-auth";
 // Re-export shared utilities for backward compatibility
 export {
   serialNumberToDate,
+  serialNumberToDateTime,
   serialNumberToTime,
   dateToSerialNumber,
   formatDateYYYYMMDD,
@@ -118,7 +119,7 @@ export class GoogleSheetsClient {
    * Get values from a specific range
    * Uses UNFORMATTED_VALUE with SERIAL_NUMBER for dates
    * Dates come back as Excel serial numbers (days since Dec 30, 1899)
-   * Use serialNumberToDate() helper to convert to JS Date objects
+   * Use serialNumberToDateTime() for datetime cells and serialNumberToDate() for date-only cells
    */
   async getValues(range: string): Promise<ValueRange> {
     const params = new URLSearchParams({

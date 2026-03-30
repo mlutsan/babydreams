@@ -57,11 +57,12 @@ describe("toggleSleep date selection", () => {
       todayStat: null,
       now: dayjs("2024-02-10T05:30:00"),
       lastEntryDate: dayjs("2024-02-09"),
+      dayStart: "08:00",
     });
 
     const values = getAppendedValues();
     expect(values[1]).toBe("2024-02-09");
-    expect(values[2]).toBe("05:30");
+    expect(values[2]).toBe("2024-02-10 05:30");
     expect(values[4]).toBe("Night");
   });
 
@@ -74,10 +75,12 @@ describe("toggleSleep date selection", () => {
       todayStat: makeStat("2024-02-09"),
       now: dayjs("2024-02-10T05:30:00"),
       lastEntryDate: null,
+      dayStart: "08:00",
     });
 
     const values = getAppendedValues();
     expect(values[1]).toBe("2024-02-09");
+    expect(values[2]).toBe("2024-02-10 05:30");
   });
 
   it("uses the current date for day sleeps even with an older lastEntryDate", async () => {
@@ -89,9 +92,11 @@ describe("toggleSleep date selection", () => {
       todayStat: null,
       now: dayjs("2024-02-10T09:00:00"),
       lastEntryDate: dayjs("2024-02-09"),
+      dayStart: "08:00",
     });
 
     const values = getAppendedValues();
     expect(values[1]).toBe("2024-02-10");
+    expect(values[2]).toBe("2024-02-10 09:00");
   });
 });

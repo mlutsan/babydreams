@@ -26,6 +26,7 @@ import {
   normalizeMinutesSinceStart,
   timeToMinutes,
 } from "~/lib/date-utils";
+import { buildWallClockDateTimeFromMinutes } from "~/lib/sheets-utils";
 
 interface StepPoint {
   timeMinutes: number;
@@ -863,7 +864,7 @@ export function EatStepChart({
                     scale={xScale}
                     tickValues={xTickValues}
                     tickFormat={(d) =>
-                      now.startOf("day").add(Number(d), "minute").format("HH:mm")
+                      buildWallClockDateTimeFromMinutes(now, Number(d)).format("HH:mm")
                     }
                     stroke="#cbd5e1"
                     tickStroke="#cbd5e1"
