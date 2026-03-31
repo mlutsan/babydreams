@@ -1,6 +1,6 @@
 import { Block, BlockTitle } from "konsta/react";
 import { formatDurationHHMM } from "~/lib/date-utils";
-import type { SleepTodaySummaryData } from "~/features/sleep/hooks/useSleepPageData";
+import type { SleepTodaySummaryData } from "~/features/sleep/lib/sleep-page-summary";
 
 interface SleepTodaySummaryProps {
   summary: SleepTodaySummaryData;

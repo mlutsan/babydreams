@@ -1,6 +1,10 @@
 import { useMemo } from "react";
 import { useLogicalDays } from "~/hooks/useLogicalDays";
 import { useMinuteTick } from "~/hooks/useMinuteTick";
+import {
+  buildSleepTodaySummary,
+  type SleepTodaySummaryData,
+} from "~/features/sleep/lib/sleep-page-summary";
 
 export type SleepPageStatusMode = "sleeping" | "awake" | "empty" | "today-empty";
 
@@ -8,13 +12,6 @@ export interface SleepPageStatus {
   mode: SleepPageStatusMode;
   sinceTime: string | null;
   sinceDurationMinutes: number | null;
-}
-
-export interface SleepTodaySummaryData {
-  totalSleepMinutes: number;
-  awakeMinutes: number;
-  daySleepMinutes: number;
-  nightSleepMinutes: number;
 }
 
 export function useSleepPageData() {
@@ -47,20 +44,13 @@ export function useSleepPageData() {
     };
   }, [sleepState, sleepStats, now]);
 
-  const currentAwakeDuration =
-    sleepState && !sleepState.isActive ? sleepState.awakeDuration : 0;
-
   const todaySummary = useMemo<SleepTodaySummaryData>(() => {
-    return {
-      totalSleepMinutes: todaySleepStat?.totalSleepMinutes ?? 0,
-      awakeMinutes:
-        (todaySleepStat?.awakeMinutes ?? 0) +
-        currentAwakeDuration +
-        (todaySleepStat ? 0 : yesterdayNightWake?.awakeDuration ?? 0),
-      daySleepMinutes: todaySleepStat?.daySleepMinutes ?? 0,
-      nightSleepMinutes: todaySleepStat?.nightSleepMinutes ?? 0,
-    };
-  }, [todaySleepStat, currentAwakeDuration, yesterdayNightWake]);
+    return buildSleepTodaySummary({
+      todaySleepStat,
+      fallbackAwakeDuration: yesterdayNightWake?.awakeDuration ?? null,
+      now,
+    });
+  }, [todaySleepStat, yesterdayNightWake, now]);
 
   const status = useMemo<SleepPageStatus>(() => {
     if (sleepState?.isActive) {

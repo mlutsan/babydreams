@@ -11,8 +11,8 @@ export function EatTodaySummary({ summary }: EatTodaySummaryProps) {
       <BlockTitle>Today</BlockTitle>
       <Block strong inset className="space-y-3">
         <div className="grid grid-cols-2 gap-2">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">Last Meal</div>
+          <div className="rounded-lg p-3 text-center">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Last Meal</div>
             <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {summary.lastMealTime}
             </div>
@@ -21,8 +21,8 @@ export function EatTodaySummary({ summary }: EatTodaySummaryProps) {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
-            <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">vs Yesterday</div>
+          <div className="rounded-lg p-3 text-center">
+            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">vs Yesterday</div>
             <div className="text-xl font-bold text-gray-900 dark:text-gray-100">
               {summary.yesterdayByNowVolume} ml
             </div>
